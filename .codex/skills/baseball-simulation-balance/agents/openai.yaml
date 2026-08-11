@@ -1,0 +1,4 @@
+interface:
+  display_name: "Baseball Simulation Balance"
+  short_description: "Validate baseball ratings and probabilistic balance"
+  default_prompt: "Use $baseball-simulation-balance to validate this baseball simulation or rating change with reproducible regression tests."
