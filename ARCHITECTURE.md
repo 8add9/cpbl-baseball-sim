@@ -49,3 +49,20 @@ Start from completed-season CPBL league outcome probabilities. Decompose a PA hi
 `baseball_sim.api` is a thin FastAPI adapter over the pure game domain. It owns HTTP validation and an in-memory session repository, but never recalculates probabilities, advances runners, or queries raw SQL. Batch mutations commit only after reaching their target state.
 
 `web/` is a React/Vite client. It consumes explicit `GameView` responses and does not sample outcomes or calculate game rules. Network/session state lives in `useGame`; focused components render score, matchup, diamond, controls, play log, and lineups. The browser is never authoritative.
+
+## M5 Career boundary
+
+`baseball_sim.career` is an immutable, batter-only event-sourced domain. Created players
+own four Composite Scores; the existing mapping derives Raw and Display ratings. Career
+simulation reuses the M3 nine-inning `GameState` and counter sampler. A neutral fixture
+supplies the other eight lineup slots and both pitchers while the created batter occupies
+the away leadoff slot. The complete inning, outs, bases, score, lineups, and pitchers are
+persisted after every internal PA; only a finished game increments completed games and
+materializes the created batter's counting stats.
+Season and career rates are derived from counting totals, never averaged.
+
+The HTTP adapter persists validated domain JSON inside a separate local SQLite database.
+Each mutation atomically checks an expected revision, applies one domain operation,
+autosaves, and records compact operation metadata for retry safety without duplicating
+the growing event payload. Clients supply UUID identifiers,
+not paths. `BaseballRealData` remains outside this boundary and untouched.

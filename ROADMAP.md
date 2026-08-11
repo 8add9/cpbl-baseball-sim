@@ -94,9 +94,32 @@ Evidence:
 
 ## M5 — Career Mode 1-1
 
+**Status:** Complete (2026-08-12)
+
 Acceptance:
 
 - Archetype creation, age, experience, development points, ratings, season/career stats, diminishing-return progression, local save/load, and simulation controls pass regression tests.
+
+Evidence:
+
+- Four equal-total-Score archetypes create age-18 batters; Score is authoritative and
+  Raw/Display ratings remain derived through `B_QuadraticTanh`.
+- Participation-only XP, a CPBL-informed conservative age curve, convex development
+  costs, per-season/per-ability limits, potential ceilings, and a 20-season retirement
+  boundary pass deterministic golden tests.
+- Career games reuse the complete M3 nine-inning state. Every internal PA, inning/base/
+  score state, partial active game, completed game, training action, season transition,
+  and retirement replays from a versioned event stream. SpeedProxy remains visible and
+  read-only until a researched runner model gives it a material effect.
+- Next PA advances through intervening neutral-fixture batters to the created player's
+  next appearance. Next important event stops at the first DP threshold, completed game,
+  or completed-season boundary, so it is distinct from the single-appearance control.
+- SQLite autosave uses transactions, optimistic revisions, and idempotent operation IDs;
+  create → simulate → train → API restart → load retained revision, games, and Power.
+- Browser QA covered identity creation, next PA, partial-save API restart, quick game,
+  six-game week, training, next event, and responsive layouts. Python: 100 passed/1
+  opt-in SQL test skipped. Frontend: 3 tests,
+  ESLint, TypeScript/Vite build, and npm audit all pass.
 
 ## M6 — Manager Mode 1-2
 

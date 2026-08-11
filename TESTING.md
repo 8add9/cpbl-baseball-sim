@@ -57,6 +57,22 @@ npm audit --audit-level=low
 
 Browser QA uses the in-app Browser at 1440×1000 and 390×844. The required interaction path is initial create → next PA → simulate half → simulate full → reset, with DOM state checks and console inspection after each mutation.
 
+M5 Career checks add:
+
+```bash
+uv run pytest tests/career tests/api/test_career_api.py
+cd web
+npm run lint
+npm test -- --run
+npm run build
+```
+
+The browser regression creates a Power archetype with explicit position/bats/throws,
+plays one PA, restarts the API with that partial game, quick-finishes it, simulates three
+six-game weeks, trains Power, and advances to the next event. Desktop and mobile checks
+assert actual CSS grid columns, document width, four controls, read-only SpeedProxy, and
+clean console output. The QA-only save is removed after the run.
+
 Run the live read-only Rating Engine contract on the server with:
 
 ```bash

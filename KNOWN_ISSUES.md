@@ -6,19 +6,25 @@ The v0.1 game state advances every runner exactly the hit's base value and holds
 
 `station-to-station-v0.1` is stored as a rules version so future empirical advancement logic does not silently alter old saves or replays.
 
-## M4 web fixture and persistence
+## Text Game fixture
 
-The Text Game currently uses neutral 65-vs-65 fixture cards (`A1`–`A9`, `H1`–`H9`) to prove the end-to-end game workflow. Real CPBL card selection is deferred to the roster/Manager milestone. FastAPI sessions are in memory and disappear on process restart; persistent, schema-versioned saves are a Career milestone gate.
+The Text Game currently uses neutral 65-vs-65 fixture cards (`A1`–`A9`, `H1`–`H9`) to prove the end-to-end game workflow. Real CPBL card selection is deferred to the roster/Manager milestone. Text Game sessions remain in memory; Career saves are separately persistent and schema-versioned.
 
 ## Open
 
-- The first PA probability model and its coefficients are not yet accepted.
+- The first hierarchical PA probability model is accepted for v0.1, but its extreme
+  Power tail remains provisional until the scheduled saturating-tail comparison.
 - Historical park, opponent, defense, catcher framing, and pitch-level context are unavailable or incomplete.
 - Stuff, HRSuppression, SpeedProxy, and Stamina are explicitly proxies.
 - Pitcher B_Role extreme tails are dominated by Swingman seasons; role-tail sensitivity remains a monitoring item.
 - 2026 is incomplete and must not enter historical baselines.
 - Overall ratings are not calibrated for the 30–110 scale and are excluded from v0.1 single-skill simulation inputs.
-- Game persistence technology and deployment provider remain undecided until API/runtime requirements are measured.
+- Career persistence is local SQLite. Deployment persistence and the Manager game-data
+  store remain undecided until hosting requirements are measured.
+- SpeedProxy is visible but read-only in Career Mode because it has no PA or runner
+  effect; training unlocks only after an empirical runner model exists.
+- Career save schemas v1-v2 are intentionally rejected by the v3 full-GameState loader;
+  no public saves existed before the milestone, so a migration was not retained.
 - `B_QuadraticTanh` is mathematically monotonic for finite real scores, but double precision loses strict distinguishability extremely near the 30/110 asymptotes. Engine validation guarantees round-trip behavior for the supported score domain `[-10, 10]`; endpoints remain display-only labels.
 - The crawler/research project still owns an administrative credential, but the game project now uses `baseball_game_reader`; SELECT succeeds and an attempted zero-row UPDATE is denied. Keep the admin credential out of this repository.
 - Public deployment rights for CPBL-derived data, player names, team names, trademarks, and logos require review before release; early UI should use text and original visual assets.

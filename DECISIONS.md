@@ -79,3 +79,27 @@
 - **Alternatives:** Persist NumPy RNG state; call global random state; sample runner advancement inside the transition function.
 - **Consequences:** Model/rules versions are part of every game save. The simplified advancement model is auditable but full-game scoring remains provisional until empirical runner transitions are available.
 - **Date:** 2026-08-11
+
+## ADR-011 — Score-authoritative Career progression
+
+- **Decision:** Career training purchases Composite Score steps, never direct Rating
+  points. Archetypes begin with equal total Score and use convex cost, per-season limits,
+  potential ceilings, deterministic age drift, and a twenty-season boundary.
+- **Why:** The mapping already supplies diminishing rating returns, while Score keeps
+  simulation semantics stable and prevents integer-display optimization. Participation XP
+  avoids rewarding strong outcomes with still faster growth.
+- **Alternatives:** Add one Rating per game; performance-based XP; free starting sliders.
+- **Consequences:** SpeedProxy is persisted but read-only until runner research gives it
+  a tested material effect. Progression changes require a model-version migration.
+- **Date:** 2026-08-12
+
+## ADR-012 — Revisioned local Career saves
+
+- **Decision:** Persist Career event/state payloads in a separate SQLite database with
+  full transactions, optimistic revisions, and an idempotent operation ledger.
+- **Why:** Process-local locks and browser localStorage cannot safely cover API restarts,
+  retry duplication, or stale multi-tab writes.
+- **Alternatives:** Reuse BaseballRealData; unversioned JSON files; client-only storage.
+- **Consequences:** The API accepts server UUIDs rather than file paths. Corrupt or future
+  saves fail closed. Public deployment still requires authentication and hosted storage.
+- **Date:** 2026-08-12

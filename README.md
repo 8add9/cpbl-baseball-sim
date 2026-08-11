@@ -2,7 +2,8 @@
 
 Independent, server-authoritative numerical baseball game built from versioned CPBL-derived player-season ratings.
 
-The project is in Phase 1. The engineering foundation, Rating Engine v0.1, and first batter-versus-pitcher Monte Carlo checkpoint are complete. Career and Manager modes intentionally have not started.
+The project is in Phase 1. Foundation, Rating Engine, matchup model, game state,
+Text Game, and Career Mode 1-1 are complete. Manager Mode is the next milestone.
 
 ## Development
 
@@ -51,4 +52,9 @@ npm ci
 npm run dev -- --host 127.0.0.1 --port 5173
 ```
 
-Open `http://127.0.0.1:5173`. The M4 browser MVP supports next PA, simulate half-inning, simulate full game, and deterministic reset. The API session store is intentionally in-memory at this milestone; persistent saves arrive with Career mode.
+Open `http://127.0.0.1:5173`. Text Game supports next PA, half/full-game simulation,
+and deterministic reset. Choose **生涯模式** to create an age-18 batter, simulate a
+season, earn participation XP/development points, train Contact/Power/Eye, inspect the
+read-only SpeedProxy, and
+resume an autosaved local career after an API restart. Set `BASEBALL_SIM_DATA_DIR` to
+choose the local SQLite save directory.

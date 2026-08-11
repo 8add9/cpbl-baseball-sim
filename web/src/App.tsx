@@ -1,3 +1,5 @@
+import { useState } from 'react'
+import { CareerMode } from './components/CareerMode'
 import { GameControls } from './components/GameControls'
 import { LineupTable } from './components/LineupTable'
 import { PlayerMatchup } from './components/PlayerMatchup'
@@ -6,7 +8,12 @@ import { ScoreRail } from './components/ScoreRail'
 import { useGame } from './useGame'
 
 export function App() {
+  const [mode, setMode] = useState<'game' | 'career'>('game')
   const { game, busy, error, act, reset } = useGame()
+
+  if (mode === 'career') {
+    return <CareerMode onBack={() => setMode('game')} />
+  }
 
   if (!game) {
     return <main className="loading-state"><strong>{error ? '無法載入比賽' : '建立比賽中…'}</strong>{error ? <p>{error}</p> : null}</main>
@@ -17,6 +24,7 @@ export function App() {
       <header className="game-header">
         <h1><span>CPBL</span> 數據野球</h1>
         <div className="header-actions">
+          <button className="mode-link" onClick={() => setMode('career')}>生涯模式</button>
           <div className="model-meta"><span>模型 {game.model_version}</span><span>種子 {game.state.seed}</span></div>
           <button className="header-reset" disabled={busy} onClick={reset}>重新開始 <span>↻</span></button>
         </div>
