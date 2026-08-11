@@ -16,6 +16,7 @@ dependencies = [
 
 [project.scripts]
 baseball-rating-export = "baseball_sim.ratings.export:main"
+baseball-sim = "baseball_sim.cli:main"
 
 [dependency-groups]
 dev = [

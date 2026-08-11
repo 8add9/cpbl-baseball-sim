@@ -63,3 +63,11 @@
 - **Alternatives:** Pool 1990–2025; use 2025 only; average player-season rates.
 - **Consequences:** The baseline and source counts are versioned. Era selection becomes an explicit context rather than a hidden model shift.
 - **Date:** 2026-08-11
+
+## ADR-009 — Hierarchical PA model v0.1
+
+- **Decision:** Accept a four-way BB/HBP/SO/contact softmax followed by conditional HR, hit/out, and hit-type stages. Use empirically estimated 1990-2025 Score-scale slopes.
+- **Why:** It preserves total probability and keeps Power/HRSuppression out of earlier BB/HBP/SO equations. The flat comparator leaked roughly -0.85 BB and -1.94 K percentage points when only Power moved 65 to 100.
+- **Alternatives:** Flat multinomial log-odds; clipped linear multiplicative weights.
+- **Consequences:** Rating 65 versus 65 is anchored to the selected league environment by convention. The Score tail is not frozen; M3 balance QA must compare a monotone saturating tail because Power 100 is an extreme Score 4.96 counterfactual.
+- **Date:** 2026-08-11

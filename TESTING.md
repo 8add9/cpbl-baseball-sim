@@ -27,6 +27,14 @@ Vary one rating at a time through 50, 65, 80, 95, 105 for Contact, Power, Eye, S
 
 Every simulation entry point accepts a seed. Tests compare deterministic counts for a fixed engine version and statistical bands for cross-version balance behavior.
 
+M2 evidence is generated reproducibly with:
+
+```bash
+uv run python research/matchup_model_research.py
+```
+
+It writes the three-model comparison, calibrated coefficient evidence, and fixed-seed Power 65 vs 100 checkpoint under `artifacts/research/`, plus `research/pa_matchup_model_report.md`.
+
 Run the live read-only Rating Engine contract on the server with:
 
 ```bash

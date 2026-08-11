@@ -40,7 +40,7 @@ Evidence:
 
 ## M2 — Matchup model and CLI checkpoint
 
-**Status:** In progress
+**Status:** Complete (2026-08-11)
 
 Acceptance:
 
@@ -49,6 +49,14 @@ Acceptance:
 - Every relevant rating passes direction, effect-size, bounds, and monotonicity tests.
 - Golden and interaction matchups run at least 100,000 PA with reproducible reports.
 - Power 100 versus 65 materially increases HR, ISO/SLG, and extra-base damage under controlled inputs.
+
+Evidence:
+
+- Three candidates ran against the audited 2021-2025 baseline; hierarchical was accepted because Power has zero structural leakage into BB/HBP/SO while flat and naive normalization do not.
+- Nine grouped-binomial slopes were estimated from 2,940 eligible batter seasons and 2,061 eligible pitcher seasons; every 95% interval excluded zero.
+- Fixed-seed 100,000-PA Power 65 vs 100 produced +7,976 HR and +.349 simulated SLG; analytic deltas were +7.855 HR percentage points and +.342 SLG.
+- 33 tests pass, including probability, monotonicity, conditional-isolation, deterministic sampler, interaction, and Monte Carlo checkpoint tests.
+- Tail strength is explicitly provisional: linear log-odds will be compared with a monotone saturating sensitivity before balance freeze.
 
 ## M3 — Baseball game state machine
 
