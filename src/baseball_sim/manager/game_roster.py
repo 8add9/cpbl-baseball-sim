@@ -58,6 +58,8 @@ class TeamGameRoster:
     used_pitcher_card_ids: tuple[str, ...]
     pitcher_bf: tuple[tuple[str, int], ...]
     pa_in_progress: PlateAppearanceSide | None = None
+    unavailable_pitcher_card_ids: tuple[str, ...] = ()
+    emergency_extension: bool = False
 
     def __post_init__(self) -> None:
         if len(self.lineup) != 9 or len(self.bench_card_ids) != 4:
@@ -79,6 +81,15 @@ class TeamGameRoster:
             raise ValueError("pitcher BF counters are invalid")
         if set(counters) != set(self.rotation_card_ids + self.bullpen_card_ids):
             raise ValueError("pitcher BF counters must cover rotation and bullpen")
+        unavailable = self.unavailable_pitcher_card_ids
+        if len(set(unavailable)) != len(unavailable):
+            raise ValueError("unavailable pitcher IDs must be unique")
+        if not set(unavailable).issubset(self.bullpen_card_ids):
+            raise ValueError("only bullpen cards may be unavailable for a game")
+        if self.active_pitcher_id in unavailable:
+            raise ValueError("the active pitcher cannot be unavailable")
+        if self.emergency_extension and self.active_pitcher_bf < self.active_pitcher_capacity:
+            raise ValueError("emergency extension requires a pitcher at BF capacity")
 
     @property
     def current_batter(self) -> LineupEntry:
@@ -94,7 +105,10 @@ class TeamGameRoster:
 
     @property
     def pitcher_change_required(self) -> bool:
-        return self.active_pitcher_bf >= self.active_pitcher_capacity
+        return (
+            not self.emergency_extension
+            and self.active_pitcher_bf >= self.active_pitcher_capacity
+        )
 
 
 def create_team_game_roster(
@@ -102,6 +116,7 @@ def create_team_game_roster(
     roster: RosterSelection,
     lineup: tuple[LineupEntry, ...],
     starting_pitcher_id: str,
+    unavailable_pitcher_card_ids: tuple[str, ...] = (),
 ) -> TeamGameRoster:
     legality = evaluate_roster(catalog, roster)
     if not legality.legal:
@@ -134,6 +149,7 @@ def create_team_game_roster(
         removed_batter_card_ids=(),
         used_pitcher_card_ids=(starting_pitcher_id,),
         pitcher_bf=counters,
+        unavailable_pitcher_card_ids=unavailable_pitcher_card_ids,
     )
 
 
@@ -168,11 +184,26 @@ def change_pitcher(state: TeamGameRoster, pitcher_card_id: str) -> TeamGameRoste
         raise ValueError("replacement pitcher must come from the bullpen")
     if pitcher_card_id in state.used_pitcher_card_ids:
         raise ValueError("a pitcher cannot re-enter the same game")
+    if pitcher_card_id in state.unavailable_pitcher_card_ids:
+        raise ValueError("pitcher is unavailable because of cross-game usage")
     return replace(
         state,
         active_pitcher_id=pitcher_card_id,
         used_pitcher_card_ids=state.used_pitcher_card_ids + (pitcher_card_id,),
+        emergency_extension=False,
     )
+
+
+def enable_emergency_extension(state: TeamGameRoster) -> TeamGameRoster:
+    """Continue the last real pitcher only when no legal unused bullpen arm remains."""
+    _require_boundary(state)
+    if state.active_pitcher_bf < state.active_pitcher_capacity:
+        raise ValueError("emergency extension requires a pitcher at BF capacity")
+    remaining = set(state.bullpen_card_ids) - set(state.used_pitcher_card_ids)
+    remaining -= set(state.unavailable_pitcher_card_ids)
+    if remaining:
+        raise ValueError("emergency extension is forbidden while a bullpen arm is available")
+    return replace(state, emergency_extension=True)
 
 
 def begin_batting_pa(state: TeamGameRoster) -> TeamGameRoster:

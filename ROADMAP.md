@@ -142,8 +142,16 @@ Current evidence:
   no-reentry rules, and role-specific Stamina BF capacity pass regression tests.
 - The seeded six-team schedule produces 360 games, 120 per team, balanced home/away
   series, and deterministic PCT/GB/tie-break standings.
-- Full Manager game simulation, cross-game pitcher rest, optimization simulations,
-  persistence, API, and browser UI remain before M6 completion.
+- Full Manager games now reuse the M3 PA engine with actual card Raw ratings, automatic
+  BF-capacity pitching changes, deterministic replay/pause, and no neutral fallback.
+- Cross-game usage enforces a four-SP rest cycle and blocks RP/Swingman cards from a
+  third consecutive team game. Six legal, disjoint AI rosters can complete all 360
+  scheduled games with internally consistent standings.
+- Deterministic beam-search roster builders produce balanced, offense-heavy,
+  pitching-heavy, and zero-SSR fixtures under the same legality contract. Strategy
+  regression tests require distinct card sets and directional batter/pitcher impact.
+- Formal paired balance simulations, Manager persistence, API, and browser UI remain
+  before M6 completion.
 
 ## M7 — Phase 1 completion
 

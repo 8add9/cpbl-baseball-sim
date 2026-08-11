@@ -147,3 +147,22 @@
 - **Consequences:** Schedule seed and rule version belong in Manager saves. Calendar dates,
   rainouts, and official CPBL postseason rules remain deferred.
 - **Date:** 2026-08-12
+
+## ADR-016 — Real-card Manager game orchestration
+
+- **Decision:** Run Manager games through the existing M3 PA engine using full-precision
+  card ratings, a four-SP rotation, cross-game bullpen availability, and deterministic
+  automatic pitching changes at PA boundaries.
+- **Why:** Manager Mode must preserve the accepted matchup probabilities and replay
+  contract while making Stamina, pitcher roles, rest, and roster depth materially affect
+  a season.
+- **Alternatives:** Create a faster second game simulator; allow relievers to start;
+  ignore rest and workload; insert a neutral emergency pitcher.
+- **Consequences:** Starters follow a four-game rotation with three intervening team
+  games; RP/Swingman cards may work at most two consecutive team games. When a legal game
+  exhausts every unused,
+  available bullpen card, the current real pitcher is explicitly marked for
+  `bullpen-exhausted-extension` and may exceed the BF capacity so extra-inning games can
+  terminate without fabricating a neutral card. This safety exception is provisional
+  and must be replaced by deeper roster/fatigue rules in a later model version.
+- **Date:** 2026-08-12

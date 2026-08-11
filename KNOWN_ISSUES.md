@@ -27,6 +27,15 @@ The Text Game currently uses neutral 65-vs-65 fixture cards (`A1`â€“`A9`, `H1`â€
   histories. LF/CF/RF may satisfy the OF roster family, but Fielding and multi-position
   eligibility remain unmodeled. Transfer-card Team values are aggregated display labels,
   not a canonical single TeamID.
+- A Manager game normally forces a pitching change after the active pitcher's
+  Stamina-derived BF limit. If every unused and cross-game-available bullpen card has
+  already been exhausted, the current real pitcher continues under an explicit
+  `bullpen-exhausted-extension` event. This prevents a legal extra-inning game from
+  deadlocking and never invents a neutral pitcher, but it is not a claim that fatigue
+  disappears; deeper staffs and fatigue-quality effects require a future model version.
+- Manager tier/cost policy has not passed its final 20,000-paired-game balance gate yet.
+  Early fixed-seed samples place zero-SSR strategies near the intended competitive
+  boundary, but they are not sufficient evidence to freeze costs or declare M6 complete.
 - Career save schemas v1-v2 are intentionally rejected by the v3 full-GameState loader;
   no public saves existed before the milestone, so a migration was not retained.
 - `B_QuadraticTanh` is mathematically monotonic for finite real scores, but double precision loses strict distinguishability extremely near the 30/110 asymptotes. Engine validation guarantees round-trip behavior for the supported score domain `[-10, 10]`; endpoints remain display-only labels.

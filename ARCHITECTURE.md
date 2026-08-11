@@ -80,5 +80,12 @@ family, while Fielding and multi-position skill are explicitly outside this cont
 The per-game roster layer adds an exact-position lineup, bench, rotation, bullpen,
 PA-boundary substitutions, and Stamina-derived pitcher BF capacity without changing PA
 quality. The season layer owns a deterministic six-team schedule and standings. Manager
-persistence, result simulation, API, and UI remain later layers and must not weaken the
-catalog or roster validation.
+persistence, API, and UI remain later layers and must not weaken the catalog or roster
+validation.
+
+Manager game orchestration connects those layers without introducing a second outcome
+engine. `ManagerGameSession` advances the authoritative M3 state one PA at a time using
+the selected cards' full-precision Raw ratings. `PitcherAvailability` supplies a rested
+four-man rotation and excludes relievers after two consecutive team games. A complete
+six-team league owns its frozen schedule, usage state, results, and derived standings;
+fixed seeds reproduce the same games and season at domain level.

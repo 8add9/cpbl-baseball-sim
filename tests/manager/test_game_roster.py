@@ -21,6 +21,7 @@ from baseball_sim.manager.game_roster import (
     complete_batting_pa,
     complete_fielding_pa,
     create_team_game_roster,
+    enable_emergency_extension,
     pinch_hit,
     pitcher_bf_capacity,
 )
@@ -147,6 +148,19 @@ def test_pitcher_change_is_boundary_only_and_used_pitcher_cannot_reenter() -> No
         change_pitcher(state, bullpen[0].card_id)
 
 
+def test_cross_game_unavailable_bullpen_pitcher_cannot_enter() -> None:
+    catalog, roster, lineup, _batters, starters, bullpen = _fixture()
+    state = create_team_game_roster(
+        catalog,
+        roster,
+        lineup,
+        starters[0].card_id,
+        (bullpen[0].card_id,),
+    )
+    with pytest.raises(ValueError, match="cross-game"):
+        change_pitcher(state, bullpen[0].card_id)
+
+
 @pytest.mark.parametrize(
     ("role", "rating", "expected"),
     [
@@ -181,3 +195,18 @@ def test_pitcher_at_cap_finishes_current_pa_then_must_change_before_next() -> No
         begin_fielding_pa(state)
     replacement = change_pitcher(state, bullpen[1].card_id)
     assert not replacement.pitcher_change_required
+
+
+def test_bullpen_exhaustion_can_extend_only_the_last_real_pitcher() -> None:
+    catalog, roster, lineup, _batters, starters, bullpen = _fixture()
+    state = create_team_game_roster(catalog, roster, lineup, starters[0].card_id)
+    for pitcher in bullpen:
+        state = change_pitcher(state, pitcher.card_id)
+    for _ in range(state.active_pitcher_capacity):
+        state = complete_fielding_pa(begin_fielding_pa(state))
+    extended = enable_emergency_extension(state)
+    assert extended.emergency_extension
+    assert not extended.pitcher_change_required
+    assert complete_fielding_pa(begin_fielding_pa(extended)).active_pitcher_bf > (
+        extended.active_pitcher_capacity
+    )

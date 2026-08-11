@@ -94,6 +94,17 @@ uv run pytest tests/manager
 When `artifacts/generated/ratings` exists, the loader test also pins all 5,160 real cards,
 5,001 competitive cards, the 159-card incomplete-season exclusion, and exact tier counts.
 
+Manager domain tests additionally cover exact-position lineups, PA-boundary
+substitutions, BF capacities, no re-entry, starter rest, reliever consecutive-game
+limits, deterministic roster optimization, pause/resume equality, a complete 360-game
+league, and standings conservation (`sum(W) == sum(L)`, `sum(RS) == sum(RA)`). The
+`bullpen-exhausted-extension` path has a dedicated regression fixture and must remain
+visible in the event stream.
+
+The tier/cost policy is not frozen until common-random-number simulations reach at least
+20,000 paired games per candidate strategy and report confidence intervals for non-star
+rosters against the legal budget reference. Small exploratory runs are diagnostics only.
+
 ## Milestone rule
 
 A green build is insufficient. Each milestone requires its acceptance tests, actual execution, QA evidence, bug fixes, and current documentation.
