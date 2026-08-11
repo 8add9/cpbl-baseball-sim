@@ -22,7 +22,7 @@ Evidence:
 
 ## M1 — Rating Engine v0.1
 
-**Status:** In progress
+**Status:** Complete (2026-08-11)
 
 Acceptance:
 
@@ -30,7 +30,17 @@ Acceptance:
 - Schema validation, deterministic regeneration, row-count reconciliation, and golden-card fixtures pass.
 - No source SQL rows or raw statistics change.
 
+Evidence:
+
+- Deterministic exports produced 3,035 batter cards and 2,125 pitcher cards twice with identical SHA-256 hashes.
+- Manifest fingerprints all four SQL source tables under `baseball_game_reader` and records schema, engine, model, mapping, as-of, inputs, outputs, and invariants.
+- Cards preserve Score, RatingRaw, RatingDisplay, role/confidence/incomplete metadata and exclude uncalibrated Overall.
+- Live integration fixture reconciles 2014 高國輝 Power and 1998 賈西 Stuff to the approved research values.
+- 2026 cards are incomplete; completed seasons are not. SQL reader has no UPDATE permission.
+
 ## M2 — Matchup model and CLI checkpoint
+
+**Status:** In progress
 
 Acceptance:
 

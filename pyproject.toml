@@ -6,15 +6,22 @@ build-backend = "hatchling.build"
 name = "cpbl-baseball-sim"
 version = "0.1.0"
 description = "Server-authoritative CPBL numerical baseball simulation"
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 dependencies = [
   "numpy>=1.26,<3",
+  "pandas>=2.2,<4",
+  "pyodbc>=5.2,<6",
+  "python-dotenv>=1.0,<2",
 ]
+
+[project.scripts]
+baseball-rating-export = "baseball_sim.ratings.export:main"
 
 [dependency-groups]
 dev = [
   "hypothesis>=6.130,<7",
   "mypy>=1.15,<2",
+  "pandas-stubs>=2.2,<3",
   "pytest>=8.3,<9",
   "pytest-cov>=6,<7",
   "ruff>=0.11,<1",
@@ -39,6 +46,10 @@ target-version = "py311"
 select = ["E", "F", "I", "UP", "B", "SIM"]
 
 [tool.mypy]
-python_version = "3.11"
+python_version = "3.12"
 strict = true
 packages = ["baseball_sim"]
+
+[[tool.mypy.overrides]]
+module = ["pyodbc"]
+ignore_missing_imports = true

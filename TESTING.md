@@ -27,6 +27,15 @@ Vary one rating at a time through 50, 65, 80, 95, 105 for Contact, Power, Eye, S
 
 Every simulation entry point accepts a seed. Tests compare deterministic counts for a fixed engine version and statistical bands for cross-version balance behavior.
 
+Run the live read-only Rating Engine contract on the server with:
+
+```bash
+BASEBALL_DATA_INTEGRATION=1 \
+BASEBALL_DATA_DIR=/home/chester/baseball-data \
+BASEBALL_DATA_ENV=.env \
+uv run pytest tests/integration/test_live_rating_export.py
+```
+
 ## Milestone rule
 
 A green build is insufficient. Each milestone requires its acceptance tests, actual execution, QA evidence, bug fixes, and current documentation.
