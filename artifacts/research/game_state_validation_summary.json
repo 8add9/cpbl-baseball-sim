@@ -1,0 +1,9 @@
+{
+  "all_final": true,
+  "average_pa": 81.851,
+  "average_total_runs": 5.35,
+  "extra_inning_rate": 0.153,
+  "games": 1000,
+  "home_win_rate": 0.473,
+  "maximum_inning": 24
+}

@@ -1,5 +1,11 @@
 # Known Issues
 
+## Station-to-station runner advancement
+
+The v0.1 game state advances every runner exactly the hit's base value and holds all runners on outs. It cannot represent sacrifice flies, double plays, errors, fielder's choices, first-to-third, scoring from second on a single, wild pitches, passed balls, SpeedProxy, Fielding, or Arm. Full-game scoring and LOB distributions are therefore provisional even though state transitions are deterministic and legal.
+
+`station-to-station-v0.1` is stored as a rules version so future empirical advancement logic does not silently alter old saves or replays.
+
 ## Open
 
 - The first PA probability model and its coefficients are not yet accepted.

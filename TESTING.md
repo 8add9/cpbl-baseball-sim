@@ -35,6 +35,14 @@ uv run python research/matchup_model_research.py
 
 It writes the three-model comparison, calibrated coefficient evidence, and fixed-seed Power 65 vs 100 checkpoint under `artifacts/research/`, plus `research/pa_matchup_model_report.md`.
 
+Run the M3 complete-game validation with:
+
+```bash
+uv run python research/game_state_validation.py
+```
+
+The 1,000-game fixture checks legal termination and aggregate diagnostics. Its run environment is not a historical calibration target because runner advancement is deliberately simplified.
+
 Run the live read-only Rating Engine contract on the server with:
 
 ```bash

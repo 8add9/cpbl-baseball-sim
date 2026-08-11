@@ -60,10 +60,20 @@ Evidence:
 
 ## M3 — Baseball game state machine
 
+**Status:** Complete (2026-08-11)
+
 Acceptance:
 
 - Nine innings, half innings, three outs, bases, score, lineup order, pitchers, PA outcomes, runner advancement, and extra innings work.
 - Unit/property tests cover scoring, base states, inning transitions, walk-offs, and deterministic replay.
+
+Evidence:
+
+- Immutable pure-domain transitions implement all eight PA outcomes, forced walks, explicit station-to-station advancement, nine-player lineups, active pitchers, regulation endings, walk-offs, and unlimited extras.
+- Counter-based BLAKE2b draws key on seed, PA index, channel, and model version; a save resumed after 25 PA exactly matches uninterrupted outcomes and final state.
+- Non-HR walk-offs credit only the runs required to win; walk-off home runs credit all runners and batter.
+- 55 tests pass, including arbitrary outcome-stream properties and complete-game replay fixtures.
+- 1,000 fixed-seed neutral games all reached legal finals; mean 81.85 PA, 15.3% extras, longest 24 innings. These are rule-validation figures, not a claim of calibrated CPBL scoring.
 
 ## M4 — Text Game web MVP
 

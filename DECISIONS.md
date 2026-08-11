@@ -71,3 +71,11 @@
 - **Alternatives:** Flat multinomial log-odds; clipped linear multiplicative weights.
 - **Consequences:** Rating 65 versus 65 is anchored to the selected league environment by convention. The Score tail is not frozen; M3 balance QA must compare a monotone saturating tail because Power 100 is an extreme Score 4.96 counterfactual.
 - **Date:** 2026-08-11
+
+## ADR-010 — Versioned state transitions and counter-based draws
+
+- **Decision:** Keep `apply_outcome` pure and sample PA outcomes with a BLAKE2b draw keyed by seed, PA index, draw channel, and simulation-model version. Use explicit `station-to-station-v0.1` advancement rules.
+- **Why:** Saves need only state plus counters, new random channels cannot perturb existing PA sequences, and event replay remains independent from an RNG library's mutable internal state.
+- **Alternatives:** Persist NumPy RNG state; call global random state; sample runner advancement inside the transition function.
+- **Consequences:** Model/rules versions are part of every game save. The simplified advancement model is auditable but full-game scoring remains provisional until empirical runner transitions are available.
+- **Date:** 2026-08-11
