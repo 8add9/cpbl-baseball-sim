@@ -44,3 +44,8 @@ ratings adapter -> versioned game rating artifacts -> pure simulation domain
 ## Initial PA model research shape
 
 Start from completed-season CPBL league outcome probabilities. Decompose a PA hierarchically into free pass, strikeout, ball in play, then hit type. Compare log-odds, multiplicative odds, and bounded hierarchical adjustments. The accepted model must preserve probability mass and pass sensitivity, interaction, and Monte Carlo regression gates.
+## M4 HTTP and client boundary
+
+`baseball_sim.api` is a thin FastAPI adapter over the pure game domain. It owns HTTP validation and an in-memory session repository, but never recalculates probabilities, advances runners, or queries raw SQL. Batch mutations commit only after reaching their target state.
+
+`web/` is a React/Vite client. It consumes explicit `GameView` responses and does not sample outcomes or calculate game rules. Network/session state lives in `useGame`; focused components render score, matchup, diamond, controls, play log, and lineups. The browser is never authoritative.

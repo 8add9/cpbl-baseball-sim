@@ -6,6 +6,10 @@ The v0.1 game state advances every runner exactly the hit's base value and holds
 
 `station-to-station-v0.1` is stored as a rules version so future empirical advancement logic does not silently alter old saves or replays.
 
+## M4 web fixture and persistence
+
+The Text Game currently uses neutral 65-vs-65 fixture cards (`A1`–`A9`, `H1`–`H9`) to prove the end-to-end game workflow. Real CPBL card selection is deferred to the roster/Manager milestone. FastAPI sessions are in memory and disappear on process restart; persistent, schema-versioned saves are a Career milestone gate.
+
 ## Open
 
 - The first PA probability model and its coefficients are not yet accepted.

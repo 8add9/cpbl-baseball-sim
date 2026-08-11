@@ -43,6 +43,20 @@ uv run python research/game_state_validation.py
 
 The 1,000-game fixture checks legal termination and aggregate diagnostics. Its run environment is not a historical calibration target because runner advancement is deliberately simplified.
 
+M4 web checks:
+
+```bash
+uv run pytest tests/api
+cd web
+npm ci
+npm run lint
+npm run test
+npm run build
+npm audit --audit-level=low
+```
+
+Browser QA uses the in-app Browser at 1440×1000 and 390×844. The required interaction path is initial create → next PA → simulate half → simulate full → reset, with DOM state checks and console inspection after each mutation.
+
 Run the live read-only Rating Engine contract on the server with:
 
 ```bash

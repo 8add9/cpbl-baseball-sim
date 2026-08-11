@@ -34,3 +34,21 @@ baseball-sim matchup \
 ```
 
 The CLI prints both analytic probabilities and sampled counts/slash line. Rating inputs are full-precision raw values in the open interval `(30, 110)`; integer display ratings are never simulation inputs.
+
+## Text Game development
+
+Start the API:
+
+```bash
+uv run uvicorn baseball_sim.api.app:app --host 127.0.0.1 --port 8000
+```
+
+In a second terminal, start React:
+
+```bash
+cd web
+npm ci
+npm run dev -- --host 127.0.0.1 --port 5173
+```
+
+Open `http://127.0.0.1:5173`. The M4 browser MVP supports next PA, simulate half-inning, simulate full game, and deterministic reset. The API session store is intentionally in-memory at this milestone; persistent saves arrive with Career mode.

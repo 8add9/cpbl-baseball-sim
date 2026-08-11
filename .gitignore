@@ -1,4 +1,5 @@
 .venv/
+.nodeenv/
 __pycache__/
 *.py[cod]
 .pytest_cache/
@@ -9,3 +10,9 @@ __pycache__/
 htmlcov/
 .env
 artifacts/generated/
+*.log
+web/node_modules/
+web/dist/
+web/*.tsbuildinfo
+web/vite.config.js
+web/vite.config.d.ts

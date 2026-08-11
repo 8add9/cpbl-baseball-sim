@@ -8,10 +8,12 @@ version = "0.1.0"
 description = "Server-authoritative CPBL numerical baseball simulation"
 requires-python = ">=3.12"
 dependencies = [
+  "fastapi>=0.115,<1",
   "numpy>=1.26,<3",
   "pandas>=2.2,<4",
   "pyodbc>=5.2,<6",
   "python-dotenv>=1.0,<2",
+  "uvicorn[standard]>=0.34,<1",
 ]
 
 [project.scripts]
@@ -20,6 +22,7 @@ baseball-sim = "baseball_sim.cli:main"
 
 [dependency-groups]
 dev = [
+  "httpx2>=2.10,<3",
   "hypothesis>=6.130,<7",
   "mypy>=1.15,<2",
   "pandas-stubs>=2.2,<3",

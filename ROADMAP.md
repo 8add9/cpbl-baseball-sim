@@ -77,10 +77,20 @@ Evidence:
 
 ## M4 — Text Game web MVP
 
+**Status:** Complete (2026-08-12)
+
 Acceptance:
 
 - FastAPI server and React client support next PA, half-inning sim, full-game sim, reset, deterministic seed, live situation, ratings, play log, and box score.
 - Responsive browser QA passes; UI is product-quality, not a debug panel.
+
+Evidence:
+
+- FastAPI exposes create/read/next-PA/simulate-half/simulate-full/reset with explicit Pydantic contracts, structured 404/409/422 errors, rollback on safety-limit failures, and thread-safe isolated session snapshots.
+- React/Vite implements the accepted desktop/mobile scorebook concept with code-native score, base state, six supported ratings, play log, lineups, controls, loading/error/final states, and no unsupported Fielding/Arm values.
+- Browser QA verified load → next PA → half inning → full game → reset. Final games disable simulation; reset restores the same fixed seed; console contained no errors or warnings.
+- Desktop 1440×1000 and mobile 390×844 had no horizontal document overflow. Mobile reset was moved into the header after visual review.
+- Python: 64 passed/1 opt-in SQL integration skipped. Frontend: ESLint, Vitest, TypeScript production build, and npm audit (0 vulnerabilities) pass.
 
 ## M5 — Career Mode 1-1
 
