@@ -66,3 +66,16 @@ Each mutation atomically checks an expected revision, applies one domain operati
 autosaves, and records compact operation metadata for retry safety without duplicating
 the growing event payload. Clients supply UUID identifiers,
 not paths. `BaseballRealData` remains outside this boundary and untouched.
+
+## M6 Manager boundary
+
+`baseball_sim.manager` loads `rating-snapshot-v0.2` through its hash-pinned manifest;
+runtime Manager games never query SQL. The catalog preserves Score and RatingRaw, derives
+neutral-65 analytic PA impact, and assigns versioned completed-pool tiers and costs.
+Incomplete 2026 cards remain visible but have no competitive tier or cost.
+
+Roster legality is a pure aggregate over canonical player-season cards. Static
+`ProfilePosition` remains exact for display; LF/CF/RF additionally qualify for the OF
+family, while Fielding and multi-position skill are explicitly outside this contract.
+Lineup, pitcher usage, substitutions, schedule, standings, and Manager persistence form
+later layers and must not weaken catalog or roster validation.

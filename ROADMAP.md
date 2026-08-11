@@ -123,10 +123,23 @@ Evidence:
 
 ## M6 — Manager Mode 1-2
 
+**Status:** In progress
+
 Acceptance:
 
 - Player-season cards, researched tiers/costs, roster building, lineup, rotation/bullpen, substitutions, games, standings, and roster constraint QA work.
 - Optimization simulations demonstrate viable non-all-star roster strategies.
+
+Current evidence:
+
+- `rating-snapshot-v0.2` exports 3,035 batter cards, 2,125 pitcher cards, and
+  2,138 normalized player profiles through the SELECT-only source identity.
+- The fail-closed catalog loads 5,160 cards, excludes 159 incomplete 2026 cards from
+  competitive tiers, and reproduces the researched batter/pitcher tier counts.
+- Pure roster validation covers 22 cards, budget 70, tier caps, distinct position
+  coverage, four SP, five bullpen pitchers, and one season card per PlayerID.
+- Pitcher workload, substitutions, schedule/standings, optimization simulations,
+  persistence, API, and browser UI remain before M6 completion.
 
 ## M7 — Phase 1 completion
 

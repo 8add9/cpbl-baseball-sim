@@ -23,6 +23,10 @@ The Text Game currently uses neutral 65-vs-65 fixture cards (`A1`â€“`A9`, `H1`â€
   store remain undecided until hosting requirements are measured.
 - SpeedProxy is visible but read-only in Career Mode because it has no PA or runner
   effect; training unlocks only after an empirical runner model exists.
+- `ProfilePosition`, Bats, and Throws are static player profiles rather than season-level
+  histories. LF/CF/RF may satisfy the OF roster family, but Fielding and multi-position
+  eligibility remain unmodeled. Transfer-card Team values are aggregated display labels,
+  not a canonical single TeamID.
 - Career save schemas v1-v2 are intentionally rejected by the v3 full-GameState loader;
   no public saves existed before the milestone, so a migration was not retained.
 - `B_QuadraticTanh` is mathematically monotonic for finite real scores, but double precision loses strict distinguishability extremely near the 30/110 asymptotes. Engine validation guarantees round-trip behavior for the supported score domain `[-10, 10]`; endpoints remain display-only labels.

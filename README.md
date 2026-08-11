@@ -2,8 +2,8 @@
 
 Independent, server-authoritative numerical baseball game built from versioned CPBL-derived player-season ratings.
 
-The project is in Phase 1. Foundation, Rating Engine, matchup model, game state,
-Text Game, and Career Mode 1-1 are complete. Manager Mode is the next milestone.
+The project is in Phase 1. Foundation through Career Mode 1-1 are complete. Manager Mode
+1-2 is in progress; its versioned card catalog and roster-legality core are complete.
 
 ## Development
 
@@ -22,6 +22,10 @@ baseball-rating-export \
   --output-dir artifacts/generated/ratings \
   --env .env
 ```
+
+The `rating-snapshot-v0.2` output contains batter and pitcher season ratings,
+`player_profiles.csv`, and a hash-pinned manifest. Manager gameplay consumes these
+artifacts and never queries `BaseballRealData` at runtime.
 
 Historical raw data remains in the separate `/home/chester/baseball-data` project and `BaseballRealData` SQL Server database. This project uses a SELECT-only identity and never writes game data into the historical source.
 

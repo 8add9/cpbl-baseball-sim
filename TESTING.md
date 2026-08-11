@@ -82,6 +82,18 @@ BASEBALL_DATA_ENV=.env \
 uv run pytest tests/integration/test_live_rating_export.py
 ```
 
+This gate verifies 3,035 batter cards, 2,125 pitcher cards, 2,138 unique normalized
+player profiles, artifact hashes, and the SELECT-only SQL identity.
+
+Run the Manager catalog and roster contract with:
+
+```bash
+uv run pytest tests/manager
+```
+
+When `artifacts/generated/ratings` exists, the loader test also pins all 5,160 real cards,
+5,001 competitive cards, the 159-card incomplete-season exclusion, and exact tier counts.
+
 ## Milestone rule
 
 A green build is insufficient. Each milestone requires its acceptance tests, actual execution, QA evidence, bug fixes, and current documentation.

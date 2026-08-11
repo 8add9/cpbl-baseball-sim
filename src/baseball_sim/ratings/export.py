@@ -16,14 +16,30 @@ from dotenv import dotenv_values
 
 from .mapping import MAPPING_VERSION, rating_display, score_to_rating
 
-SCHEMA_VERSION = "rating-snapshot-v0.1"
+SCHEMA_VERSION = "rating-snapshot-v0.2"
 ENGINE_VERSION = "rating-engine-v0.1"
 BATTER_MODEL_VERSION = "A_WinsorizedBalanced-v0.1"
 PITCHER_MODEL_VERSION = "B_Role-v0.1"
 AS_OF_DATE = "2026-08-11"
+PROFILE_VERSION = "player-profile-v0.1"
 BATTER_ABILITIES = ("Contact", "Power", "Eye", "SpeedProxy")
 PITCHER_ABILITIES = ("Stuff", "Control", "HRSuppression", "Stamina")
 SOURCE_TABLES = ("Teams", "Players", "BattingStats", "PitchingStats")
+
+POSITION_CODES = {
+    "捕手": "C",
+    "一壘手": "1B",
+    "二壘手": "2B",
+    "三壘手": "3B",
+    "游擊手": "SS",
+    "左外野手": "LF",
+    "中外野手": "CF",
+    "右外野手": "RF",
+    "指定打擊": "DH",
+    "投手": "P",
+}
+BAT_CODES = {"右": "R", "左": "L", "左右": "S"}
+THROW_CODES = {"右": "R", "左": "L"}
 
 
 def sha256_file(path: Path) -> str:
@@ -218,6 +234,48 @@ def read_source_fingerprint(config: Mapping[str, str | None]) -> dict[str, Any]:
     return {"database": "BaseballRealData", "identity": "baseball_game_reader", "tables": tables}
 
 
+def build_player_profiles(source: pd.DataFrame) -> pd.DataFrame:
+    """Normalize immutable player metadata for roster legality and display."""
+    required = {"PlayerID", "PlayerName", "Position", "Bats", "Throws"}
+    missing = required - set(source.columns)
+    if missing:
+        raise ValueError(f"player profile source missing columns: {sorted(missing)}")
+    profiles = source[list(required)].copy()
+    if profiles.isna().any().any():
+        raise ValueError("player profile identity fields cannot be null")
+    if profiles["PlayerID"].duplicated().any():
+        raise ValueError("player profile PlayerID must be unique")
+    profiles["ProfilePosition"] = profiles["Position"].map(POSITION_CODES)
+    profiles["Bats"] = profiles["Bats"].map(BAT_CODES)
+    profiles["Throws"] = profiles["Throws"].map(THROW_CODES)
+    if profiles[["ProfilePosition", "Bats", "Throws"]].isna().any().any():
+        raise ValueError("player profile contains an unsupported position or handedness")
+    profiles = profiles.drop(columns="Position")
+    profiles.insert(2, "ProfileVersion", PROFILE_VERSION)
+    columns = [
+        "PlayerID",
+        "PlayerName",
+        "ProfileVersion",
+        "ProfilePosition",
+        "Bats",
+        "Throws",
+    ]
+    return profiles[columns].sort_values("PlayerID", kind="stable").reset_index(drop=True)
+
+
+def read_player_profiles(config: Mapping[str, str | None]) -> pd.DataFrame:
+    with _connect_reader(config) as connection:
+        cursor = connection.cursor()
+        cursor.execute(
+            "SELECT PlayerID, PlayerName, Position, Bats, Throws "
+            "FROM dbo.Players ORDER BY PlayerID"
+        )
+        columns = [column[0] for column in cursor.description]
+        rows = [tuple(row) for row in cursor.fetchall()]
+        connection.rollback()
+    return build_player_profiles(pd.DataFrame.from_records(rows, columns=columns))
+
+
 def _csv_bytes(frame: pd.DataFrame) -> bytes:
     text = frame.to_csv(index=False, lineterminator="\n", float_format="%.12g")
     return text.encode("utf-8")
@@ -243,11 +301,15 @@ def export_snapshots(
     pitcher_source = data_dir / "analysis" / "output" / "pitching_rating_scale_comparison.csv"
     batter = build_batter_snapshot(pd.read_csv(batter_source, low_memory=False))
     pitcher = build_pitcher_snapshot(pd.read_csv(pitcher_source, low_memory=False))
+    profiles = read_player_profiles(db_config)
     batter_payload, pitcher_payload = _csv_bytes(batter), _csv_bytes(pitcher)
+    profile_payload = _csv_bytes(profiles)
     batter_path = output_dir / "batter_season_ratings.csv"
     pitcher_path = output_dir / "pitcher_season_ratings.csv"
+    profile_path = output_dir / "player_profiles.csv"
     _atomic_write(batter_path, batter_payload)
     _atomic_write(pitcher_path, pitcher_payload)
+    _atomic_write(profile_path, profile_payload)
     manifest: dict[str, Any] = {
         "schema_version": SCHEMA_VERSION,
         "engine_version": ENGINE_VERSION,
@@ -272,6 +334,12 @@ def export_snapshots(
                 "path": pitcher_path.name,
                 "rows": len(pitcher),
                 "sha256": _hash_bytes(pitcher_payload),
+            },
+            "player_profiles": {
+                "path": profile_path.name,
+                "rows": len(profiles),
+                "sha256": _hash_bytes(profile_payload),
+                "version": PROFILE_VERSION,
             },
         },
         "invariants": {

@@ -3,7 +3,11 @@ from __future__ import annotations
 import pandas as pd
 import pytest
 
-from baseball_sim.ratings.export import build_batter_snapshot, build_pitcher_snapshot
+from baseball_sim.ratings.export import (
+    build_batter_snapshot,
+    build_pitcher_snapshot,
+    build_player_profiles,
+)
 
 
 def _ability_rows(abilities: tuple[str, ...], pitcher: bool = False) -> pd.DataFrame:
@@ -50,3 +54,43 @@ def test_incomplete_ability_set_is_rejected() -> None:
     source = _ability_rows(("Contact", "Power", "Eye", "SpeedProxy"))
     with pytest.raises(ValueError, match="incomplete or duplicated"):
         build_batter_snapshot(source.iloc[:-1])
+
+
+def test_player_profiles_normalize_position_and_handedness() -> None:
+    source = pd.DataFrame(
+        [
+            {
+                "PlayerID": 2,
+                "PlayerName": "Pitcher",
+                "Position": "投手",
+                "Bats": "左",
+                "Throws": "右",
+            },
+            {
+                "PlayerID": 1,
+                "PlayerName": "Catcher",
+                "Position": "捕手",
+                "Bats": "左右",
+                "Throws": "右",
+            },
+        ]
+    )
+    profiles = build_player_profiles(source)
+    assert profiles.PlayerID.tolist() == [1, 2]
+    assert profiles.ProfilePosition.tolist() == ["C", "P"]
+    assert profiles.Bats.tolist() == ["S", "L"]
+    assert profiles.Throws.tolist() == ["R", "R"]
+    assert set(profiles.ProfileVersion) == {"player-profile-v0.1"}
+
+
+def test_player_profiles_reject_unknown_or_duplicate_identity() -> None:
+    source = pd.DataFrame(
+        [
+            {"PlayerID": 1, "PlayerName": "A", "Position": "捕手", "Bats": "右", "Throws": "右"},
+            {"PlayerID": 1, "PlayerName": "B", "Position": "未知", "Bats": "右", "Throws": "右"},
+        ]
+    )
+    with pytest.raises(ValueError, match="unique"):
+        build_player_profiles(source)
+    with pytest.raises(ValueError, match="unsupported"):
+        build_player_profiles(source.iloc[[1]].assign(PlayerID=2))

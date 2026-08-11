@@ -42,10 +42,13 @@
 
 ## ADR-006 — Versioned rating snapshots
 
-- **Decision:** Generate versioned batter and pitcher rating snapshots plus a manifest; do not query raw SQL during each plate appearance.
+- **Decision:** Generate versioned batter and pitcher rating snapshots, normalized
+  player-profile metadata, and a manifest; do not query raw SQL during gameplay.
 - **Why:** Games must be reproducible, deployable, and isolated from changing research artifacts.
 - **Alternatives:** Import research scripts at runtime; query `BaseballRealData` for every game action.
-- **Consequences:** M1 requires an importer, source fingerprint, deterministic artifact hashes, and model/mapping metadata.
+- **Consequences:** M1 requires an importer, source fingerprint, deterministic artifact
+  hashes, and model/mapping/profile metadata. `ProfilePosition` is a player-level primary
+  position proxy, not a season-specific defensive rating.
 - **Date:** 2026-08-11
 
 ## ADR-007 — Read-only truth-source identity
@@ -102,4 +105,19 @@
 - **Alternatives:** Reuse BaseballRealData; unversioned JSON files; client-only storage.
 - **Consequences:** The API accepts server UUIDs rather than file paths. Corrupt or future
   saves fail closed. Public deployment still requires authentication and hosted storage.
+- **Date:** 2026-08-12
+
+## ADR-013 — Analytic card impact and budget tiers
+
+- **Decision:** Price Manager cards from the accepted PA model against neutral-65
+  opposition: batter simplified OPS and the negative of pitcher OPS allowed. Use
+  completed-pool average-rank percentiles for N/R/SR/SSR at 40/75/95 percent and costs
+  1/3/6/10 under policy `tier-impact-v0.1+baseline2021-25`.
+- **Why:** This preserves researched component semantics, keeps Stamina in workload, and
+  avoids inventing an Overall or averaging integer Display ratings.
+- **Alternatives:** Mean ability display; historical reputation tiers; fixed per-ability
+  thresholds; unrestricted all-star rosters.
+- **Consequences:** 2026 cards are exhibition-only. Saves pin the catalog manifest hash.
+  Tier labels mean budget impact rather than awards or collectible rarity, and the policy
+  must pass paired non-all-star strategy simulations before M6 is complete.
 - **Date:** 2026-08-12
