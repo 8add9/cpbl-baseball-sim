@@ -138,7 +138,11 @@ Current evidence:
   competitive tiers, and reproduces the researched batter/pitcher tier counts.
 - Pure roster validation covers 22 cards, budget 70, tier caps, distinct position
   coverage, four SP, five bullpen pitchers, and one season card per PlayerID.
-- Pitcher workload, substitutions, schedule/standings, optimization simulations,
+- Exact-position lineup/bench state, PA-boundary pinch hitting and pitching changes,
+  no-reentry rules, and role-specific Stamina BF capacity pass regression tests.
+- The seeded six-team schedule produces 360 games, 120 per team, balanced home/away
+  series, and deterministic PCT/GB/tie-break standings.
+- Full Manager game simulation, cross-game pitcher rest, optimization simulations,
   persistence, API, and browser UI remain before M6 completion.
 
 ## M7 — Phase 1 completion

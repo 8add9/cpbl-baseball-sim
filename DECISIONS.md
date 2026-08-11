@@ -121,3 +121,29 @@
   Tier labels mean budget impact rather than awards or collectible rarity, and the policy
   must pass paired non-all-star strategy simulations before M6 is complete.
 - **Date:** 2026-08-12
+
+## ADR-014 — Stamina controls workload, not PA quality
+
+- **Decision:** Convert pitcher Stamina Raw into a role-specific hard batters-faced
+  capacity. A pitcher completes the PA that reaches the limit and must be replaced before
+  the next fielding PA; PA outcome probabilities remain unchanged.
+- **Why:** Current research supports workload but not a fatigue-quality curve. Without a
+  capacity, relievers can unrealistically start and finish every game.
+- **Alternatives:** Ignore Stamina; reduce Stuff linearly while tired; use pitch counts
+  that the source data cannot calibrate.
+- **Consequences:** SP, Swingman, and RP use separate clamped formulas. Substitutions occur
+  only at PA boundaries, and used batters or pitchers cannot re-enter in v0.1.
+- **Date:** 2026-08-12
+
+## ADR-015 — Deterministic six-team Manager season
+
+- **Decision:** Use a seeded circle schedule with six teams, 24 games per opponent split
+  12 home/12 away, for 120 games per team and 360 league games. Rank by PCT, run
+  differential, runs scored, then TeamID; Manager games cannot end tied.
+- **Why:** It supplies a reproducible league and standings contract without claiming to
+  reproduce a particular CPBL calendar or official tie-break regulation.
+- **Alternatives:** Copy one historical calendar; generate mutable random schedules;
+  include rainouts and ties before those systems are modeled.
+- **Consequences:** Schedule seed and rule version belong in Manager saves. Calendar dates,
+  rainouts, and official CPBL postseason rules remain deferred.
+- **Date:** 2026-08-12

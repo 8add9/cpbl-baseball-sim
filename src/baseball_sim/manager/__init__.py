@@ -13,8 +13,22 @@ from .cards import (
     Tier,
     impact,
 )
+from .game_roster import (
+    LineupEntry,
+    PlateAppearanceSide,
+    TeamGameRoster,
+    begin_batting_pa,
+    begin_fielding_pa,
+    change_pitcher,
+    complete_batting_pa,
+    complete_fielding_pa,
+    create_team_game_roster,
+    pinch_hit,
+    pitcher_bf_capacity,
+)
 from .loader import RATING_ARTIFACT_SCHEMA, load_card_catalog
 from .roster import RosterLegality, RosterRules, RosterSelection, evaluate_roster
+from .season import GameResult, ScheduledGame, Standing, Standings, generate_schedule
 
 __all__ = [
     "TIER_POLICY_VERSION",
@@ -23,15 +37,31 @@ __all__ = [
     "CardCatalog",
     "CardKind",
     "CatalogEntry",
+    "GameResult",
+    "LineupEntry",
+    "PlateAppearanceSide",
     "PitcherRole",
     "PlayerSeasonCard",
     "RATING_ARTIFACT_SCHEMA",
     "RosterLegality",
     "RosterRules",
     "RosterSelection",
+    "ScheduledGame",
+    "Standing",
+    "Standings",
+    "TeamGameRoster",
     "Tier",
     "ThrowSide",
+    "begin_batting_pa",
+    "begin_fielding_pa",
+    "change_pitcher",
+    "complete_batting_pa",
+    "complete_fielding_pa",
+    "create_team_game_roster",
     "evaluate_roster",
+    "generate_schedule",
     "impact",
     "load_card_catalog",
+    "pinch_hit",
+    "pitcher_bf_capacity",
 ]

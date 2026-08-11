@@ -77,5 +77,8 @@ Incomplete 2026 cards remain visible but have no competitive tier or cost.
 Roster legality is a pure aggregate over canonical player-season cards. Static
 `ProfilePosition` remains exact for display; LF/CF/RF additionally qualify for the OF
 family, while Fielding and multi-position skill are explicitly outside this contract.
-Lineup, pitcher usage, substitutions, schedule, standings, and Manager persistence form
-later layers and must not weaken catalog or roster validation.
+The per-game roster layer adds an exact-position lineup, bench, rotation, bullpen,
+PA-boundary substitutions, and Stamina-derived pitcher BF capacity without changing PA
+quality. The season layer owns a deterministic six-team schedule and standings. Manager
+persistence, result simulation, API, and UI remain later layers and must not weaken the
+catalog or roster validation.
