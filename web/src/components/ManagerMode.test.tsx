@@ -45,7 +45,10 @@ beforeEach(() => {
     ok: true, json: () => Promise.resolve({ managers: [manager] }),
   }))
 })
-afterEach(cleanup)
+afterEach(() => {
+  cleanup()
+  vi.unstubAllGlobals()
+})
 
 test('renders server-authoritative roster, standings, ratings, and three controls', async () => {
   render(<ManagerMode onBack={() => undefined} />)
@@ -61,6 +64,7 @@ test('renders server-authoritative roster, standings, ratings, and three control
 })
 
 test('mobile tabs expose standings and mutation sends current revision', async () => {
+  vi.stubGlobal('crypto', {})
   render(<ManagerMode onBack={() => undefined} />)
   await screen.findByRole('heading', { name: '先發打線' })
   fireEvent.click(screen.getByRole('button', { name: '戰績' }))

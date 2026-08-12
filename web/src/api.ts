@@ -90,6 +90,15 @@ export interface CareerView {
 }
 
 const JSON_HEADERS = { 'Content-Type': 'application/json' }
+let operationCounter = 0
+
+function operationId(): string {
+  operationCounter = (operationCounter + 1) % 0x1000000
+  const timestamp = Date.now().toString(36)
+  const counter = operationCounter.toString(36)
+  const random = Math.floor(Math.random() * 0x100000000).toString(36)
+  return `web-${timestamp}-${counter}-${random}`
+}
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, init)
@@ -141,7 +150,7 @@ export function createCareer(input: {
     method: 'POST', headers: JSON_HEADERS,
     body: JSON.stringify({
       ...input, season_year: 2026, seed: 20260812,
-      season_games: 120, expected_revision: 0, operation_id: crypto.randomUUID(),
+      season_games: 120, expected_revision: 0, operation_id: operationId(),
     }),
   })
 }
@@ -155,7 +164,7 @@ export function mutateCareer(
   return request(`/api/careers/${career.career_id}/${action}`, {
     method: 'POST', headers: JSON_HEADERS,
     body: JSON.stringify({
-      expected_revision: career.revision, operation_id: crypto.randomUUID(), ...extra,
+      expected_revision: career.revision, operation_id: operationId(), ...extra,
     }),
   })
 }
@@ -207,7 +216,7 @@ export function createManager(seed = 20260812): Promise<ManagerView> {
   return request('/api/managers', {
     method: 'POST', headers: JSON_HEADERS,
     body: JSON.stringify({
-      seed, expected_revision: 0, operation_id: crypto.randomUUID(),
+      seed, expected_revision: 0, operation_id: operationId(),
     }),
   })
 }
@@ -219,7 +228,7 @@ export function mutateManager(
   return request(`/api/managers/${manager.manager_id}/${action}`, {
     method: 'POST', headers: JSON_HEADERS,
     body: JSON.stringify({
-      expected_revision: manager.revision, operation_id: crypto.randomUUID(),
+      expected_revision: manager.revision, operation_id: operationId(),
     }),
   })
 }
@@ -246,7 +255,7 @@ export function replaceManagerCard(
     method: 'POST', headers: JSON_HEADERS,
     body: JSON.stringify({
       expected_revision: manager.revision,
-      operation_id: crypto.randomUUID(),
+      operation_id: operationId(),
       team_id: teamId,
       outgoing_card_id: outgoingCardId,
       incoming_card_id: incomingCardId,
