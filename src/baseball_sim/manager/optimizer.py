@@ -189,9 +189,9 @@ def build_optimized_roster(
                 sr_count = state.sr_count + int(entry.tier is Tier.SR)
                 ssr_count = state.ssr_count + int(entry.tier is Tier.SSR)
                 if (
-                    cost + remaining > rules.budget
+                    (rules.budget is not None and cost + remaining > rules.budget)
                     or sr_count > rules.max_sr
-                    or ssr_count > rules.max_ssr
+                    or (rules.max_ssr is not None and ssr_count > rules.max_ssr)
                 ):
                     continue
                 expanded.append(

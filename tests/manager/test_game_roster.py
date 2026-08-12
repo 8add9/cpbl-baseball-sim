@@ -25,7 +25,7 @@ from baseball_sim.manager.game_roster import (
     pinch_hit,
     pitcher_bf_capacity,
 )
-from baseball_sim.manager.roster import RosterSelection
+from baseball_sim.manager.roster import RosterRules, RosterSelection
 from baseball_sim.ratings.mapping import rating_to_score, score_to_rating
 
 
@@ -109,6 +109,39 @@ def test_builds_lineup9_bench4_rotation4_bullpen5_with_exact_positions() -> None
     assert len(state.rotation_card_ids) == 4
     assert len(state.bullpen_card_ids) == 5
     assert state.current_batter.position == "C"
+
+
+def test_expanded_roster_allows_ten_catchers_on_bench() -> None:
+    catalog, roster, lineup, _batters, starters, bullpen = _fixture()
+    catchers = tuple(_batter(200 + index, "C") for index in range(10))
+    expanded_catalog = CardCatalog(
+        "snapshot-expanded-v1",
+        tuple(entry.card for entry in catalog.entries()) + catchers,
+    )
+    expanded = RosterSelection(
+        tuple(entry.card_id for entry in lineup) + tuple(card.card_id for card in catchers),
+        tuple(card.card_id for card in starters),
+        tuple(card.card_id for card in bullpen),
+    )
+    rules = RosterRules(
+        roster_size=28,
+        batter_count=19,
+        budget=1_000,
+        max_ssr=100,
+        max_sr=100,
+    )
+    state = create_team_game_roster(
+        expanded_catalog,
+        expanded,
+        lineup,
+        starters[0].card_id,
+        rules=rules,
+    )
+    assert len(state.bench_card_ids) == 10
+    assert all(
+        expanded_catalog.get(card_id).card.profile_positions == ("C",)
+        for card_id in state.bench_card_ids
+    )
 
 
 def test_exact_outfield_assignment_rejects_cf_card_in_lf_slot() -> None:

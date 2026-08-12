@@ -7,7 +7,7 @@ from dataclasses import dataclass, replace
 from enum import StrEnum
 
 from .cards import CardCatalog, CardKind, PitcherRole, PlayerSeasonCard
-from .roster import RosterSelection, evaluate_roster
+from .roster import DEFAULT_ROSTER_RULES, RosterRules, RosterSelection, evaluate_roster
 
 LINEUP_POSITIONS = frozenset({"C", "1B", "2B", "3B", "SS", "LF", "CF", "RF", "DH"})
 
@@ -62,8 +62,8 @@ class TeamGameRoster:
     emergency_extension: bool = False
 
     def __post_init__(self) -> None:
-        if len(self.lineup) != 9 or len(self.bench_card_ids) != 4:
-            raise ValueError("a game roster requires lineup 9 and bench 4")
+        if len(self.lineup) != 9 or len(self.bench_card_ids) < 4:
+            raise ValueError("a game roster requires lineup 9 and at least four bench cards")
         if len(self.rotation_card_ids) != 4 or len(self.bullpen_card_ids) != 5:
             raise ValueError("a game roster requires rotation 4 and bullpen 5")
         if {entry.position for entry in self.lineup} != LINEUP_POSITIONS:
@@ -117,8 +117,9 @@ def create_team_game_roster(
     lineup: tuple[LineupEntry, ...],
     starting_pitcher_id: str,
     unavailable_pitcher_card_ids: tuple[str, ...] = (),
+    rules: RosterRules = DEFAULT_ROSTER_RULES,
 ) -> TeamGameRoster:
-    legality = evaluate_roster(catalog, roster)
+    legality = evaluate_roster(catalog, roster, rules)
     if not legality.legal:
         raise ValueError(f"manager roster is illegal: {'; '.join(legality.violations)}")
     lineup_ids = tuple(entry.card_id for entry in lineup)

@@ -5,17 +5,35 @@ from __future__ import annotations
 from dataclasses import replace
 
 from .cards import CardCatalog
+from .customization import (
+    rename_team,
+    roster_limits_for_name,
+    set_rotation_plan,
+    set_starting_lineup,
+)
+from .franchise import TeamEntitlement
+from .game_roster import LineupEntry
 from .league import (
     ManagerLeagueState,
     ManagerTeamConfig,
     create_manager_league,
     simulate_manager_season,
+    start_next_manager_season,
 )
 from .league import (
     simulate_next_league_game as simulate_next_domain_game,
 )
 from .optimizer import RosterStrategy, build_optimized_roster
-from .roster import RosterSelection
+from .roster import RosterRules, RosterSelection, evaluate_roster
+
+AI_CPBL_TEAM_NAMES = (
+    "中信兄弟",
+    "統一7-ELEVEn獅",
+    "樂天桃猿",
+    "味全龍",
+    "富邦悍將",
+    "台鋼雄鷹",
+)
 
 
 def create_ai_league(catalog: CardCatalog, seed: int) -> ManagerLeagueState:
@@ -39,7 +57,7 @@ def create_ai_league(catalog: CardCatalog, seed: int) -> ManagerLeagueState:
                 team_id=f"team-{index + 1}",
                 roster=optimized.selection,
                 lineup=optimized.lineup,
-                name=f"AI Team {index + 1}",
+                name=AI_CPBL_TEAM_NAMES[index],
                 strategy=strategy.value,
             )
         )
@@ -52,6 +70,7 @@ def simulate_league_round(
     state: ManagerLeagueState, _catalog: CardCatalog
 ) -> ManagerLeagueState:
     """Complete the current three-game schedule round atomically."""
+    _validate_active_rosters(state)
     scheduled = state.next_game
     if scheduled is None:
         raise ValueError("Manager season is complete")
@@ -65,13 +84,96 @@ def simulate_league_round(
 def simulate_league_season(
     state: ManagerLeagueState, _catalog: CardCatalog
 ) -> ManagerLeagueState:
+    _validate_active_rosters(state)
     return simulate_manager_season(state)
 
 
 def simulate_next_league_game(
     state: ManagerLeagueState, _catalog: CardCatalog
 ) -> ManagerLeagueState:
+    _validate_active_rosters(state)
     return simulate_next_domain_game(state)
+
+
+def _entitlement(state: ManagerLeagueState, team_id: str) -> TeamEntitlement:
+    assert state.franchise is not None
+    return next(item for item in state.franchise.entitlements if item.team_id == team_id)
+
+
+def _rules_for_team(state: ManagerLeagueState, team_id: str) -> RosterRules:
+    team = next(item for item in state.teams if item.config.team_id == team_id)
+    entitlement = _entitlement(state, team_id)
+    limits = roster_limits_for_name(
+        team.config.name or team_id,
+        cost_bonus=entitlement.cost_budget_bonus,
+        ssr_bonus=entitlement.ssr_cap_bonus,
+    )
+    selection = team.config.roster
+    return RosterRules(
+        roster_size=len(selection.all_card_ids),
+        batter_count=len(selection.batter_card_ids),
+        rotation_count=4,
+        bullpen_count=5,
+        budget=limits.cost_limit,
+        max_ssr=limits.ssr_limit,
+        max_sr=5,
+    )
+
+
+def _validate_active_rosters(state: ManagerLeagueState) -> None:
+    for team in state.teams:
+        legality = evaluate_roster(
+            state.catalog,
+            team.config.roster,
+            _rules_for_team(state, team.config.team_id),
+        )
+        if not legality.legal:
+            raise ValueError(
+                f"illegal active roster for {team.config.name}: {legality.violations}"
+            )
+
+
+def rename_user_team(state: ManagerLeagueState, display_name: str) -> ManagerLeagueState:
+    teams = tuple(
+        replace(team, config=rename_team(team.config, display_name))
+        if team.config.team_id == state.user_team_id
+        else team
+        for team in state.teams
+    )
+    return replace(state, teams=teams)
+
+
+def update_user_lineup(
+    state: ManagerLeagueState, lineup: tuple[LineupEntry, ...]
+) -> ManagerLeagueState:
+    target = next(team for team in state.teams if team.config.team_id == state.user_team_id)
+    validated = set_starting_lineup(state.catalog, target.config.roster, lineup)
+    teams = tuple(
+        replace(team, config=replace(team.config, lineup=validated, strategy="custom"))
+        if team.config.team_id == state.user_team_id
+        else team
+        for team in state.teams
+    )
+    return replace(state, teams=teams)
+
+
+def update_user_rotation_plan(
+    state: ManagerLeagueState, starter_card_ids: tuple[str, ...]
+) -> ManagerLeagueState:
+    target = next(team for team in state.teams if team.config.team_id == state.user_team_id)
+    plan = set_rotation_plan(target.config.roster, starter_card_ids)
+    plans = tuple(
+        (team_id, plan.starter_card_ids if team_id == state.user_team_id else current)
+        for team_id, current in state.rotation_plans
+    )
+    return replace(state, rotation_plans=plans)
+
+
+def advance_manager_season(
+    state: ManagerLeagueState, _catalog: CardCatalog
+) -> ManagerLeagueState:
+    _validate_active_rosters(state)
+    return start_next_manager_season(state)
 
 
 def replace_team_card(
@@ -122,10 +224,33 @@ def replace_team_card(
         else entry
         for entry in target.config.lineup
     )
-    configs = tuple(
-        replace(team.config, roster=replacement, lineup=lineup, strategy="custom")
+    legality = evaluate_roster(catalog, replacement, _rules_for_team(state, team_id))
+    if not legality.legal:
+        raise ValueError(f"illegal replacement roster: {legality.violations}")
+    teams = tuple(
+        replace(
+            team,
+            config=replace(
+                team.config,
+                roster=replacement,
+                lineup=lineup,
+                strategy="custom",
+            ),
+        )
         if team.config.team_id == team_id
-        else team.config
+        else team
         for team in state.teams
     )
-    return create_manager_league(catalog, configs, seed=state.seed)
+    plans = tuple(
+        (
+            plan_team_id,
+            tuple(
+                incoming_card_id if card_id == outgoing_card_id else card_id
+                for card_id in plan
+            ),
+        )
+        if plan_team_id == team_id
+        else (plan_team_id, plan)
+        for plan_team_id, plan in state.rotation_plans
+    )
+    return replace(state, teams=teams, rotation_plans=plans)

@@ -142,6 +142,31 @@ button:focus-visible { outline: 2px solid var(--amber); outline-offset: 3px; }
   .lineup-table ol { grid-template-columns: repeat(2,1fr); }
 }
 
+/* Manager v2 customization and season controls. */
+.manager-customize-bar { display: flex; align-items: end; gap: 10px; margin-top: 8px; padding: 10px 14px; border: 1px solid var(--line); border-radius: 7px; background: #0a151f; }
+.manager-customize-bar label { display: grid; gap: 4px; color: var(--muted); font-size: 11px; }
+.manager-customize-bar input,.manager-customize-bar button,.manager-roster-group select { min-height: 34px; padding: 0 9px; border: 1px solid #40515e; border-radius: 4px; background: var(--ink-950); color: var(--text); }
+.manager-customize-bar strong { margin-left: auto; color: var(--amber); }
+.manager-order-buttons { display: flex; gap: 3px; }
+.manager-order-buttons i { display: grid; width: 18px; height: 22px; place-items: center; border: 1px solid #40515e; border-radius: 3px; font-style: normal; }
+.manager-order-buttons i[aria-disabled="true"] { opacity: .25; pointer-events: none; }
+.manager-roster-group > label { min-height: 38px; display: grid; grid-template-columns: 52px 1fr; align-items: center; gap: 8px; padding: 0 10px; color: var(--muted); font-size: 11px; }
+.manager-player-stats { max-height: 540px; overflow: hidden; }
+.manager-stats-scroll { max-height: 490px; overflow: auto; }
+.manager-stats-scroll > div { display: grid; grid-template-columns: 1fr auto; gap: 3px 10px; padding: 9px 12px; border-bottom: 1px solid #1d2d39; }
+.manager-stats-scroll small { color: var(--amber); }
+.manager-stats-scroll span { grid-column: 1/-1; color: var(--muted); font-size: 10px; line-height: 1.5; }
+.manager-command { grid-template-columns: minmax(190px,1fr) repeat(4,minmax(145px,220px)); }
+@media (max-width: 1099px) {
+  .manager-dashboard.tab-stats .manager-league-column { display: grid; }
+  .manager-command { grid-template-columns: repeat(4,1fr); }
+}
+@media (max-width: 699px) {
+  .manager-customize-bar { align-items: stretch; flex-direction: column; }
+  .manager-customize-bar strong { margin-left: 0; }
+  .manager-command { grid-template-columns: repeat(2,1fr); }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
 }
@@ -212,4 +237,13 @@ button:focus-visible { outline: 2px solid var(--amber); outline-offset: 3px; }
   .manager-groups { grid-template-columns: 1fr; }.manager-roster-group:first-child { grid-row: auto; border-right: 0; border-bottom: 1px solid var(--line); }
   .manager-command { position: sticky; bottom: 0; z-index: 5; grid-template-columns: repeat(3,1fr); padding: 8px; }.manager-command > div { display: none; }.manager-command button { min-width: 0; min-height: 60px; gap: 4px; padding: 4px; font-size: 12px; }.manager-command button span { font-size: 11px; text-align: center; }.manager-command button small { display: none; }
   .standings-row { grid-template-columns: 24px minmax(70px,1fr) repeat(4,37px); padding: 0 7px; font-size: 11px; }
+}
+
+.manager-command { grid-template-columns: minmax(190px,1fr) repeat(4,minmax(145px,220px)); }
+@media (max-width: 1099px) {
+  .manager-dashboard.tab-stats .manager-league-column { display: grid; }
+  .manager-command { grid-template-columns: repeat(4,1fr); }
+}
+@media (max-width: 699px) {
+  .manager-command { grid-template-columns: repeat(2,1fr); }
 }

@@ -22,6 +22,25 @@ class ReplaceManagerCardRequest(ManagerMutationRequest):
     incoming_card_id: str = Field(min_length=1, max_length=256)
 
 
+class RenameManagerTeamRequest(ManagerMutationRequest):
+    name: str = Field(min_length=1, max_length=40)
+
+
+class ManagerLineupEntryRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    card_id: str = Field(min_length=1, max_length=256)
+    position: str = Field(pattern=r"^(C|1B|2B|3B|SS|LF|CF|RF|DH)$")
+
+
+class UpdateManagerLineupRequest(ManagerMutationRequest):
+    lineup: list[ManagerLineupEntryRequest] = Field(min_length=9, max_length=9)
+
+
+class UpdateManagerRotationRequest(ManagerMutationRequest):
+    starter_card_ids: list[str] = Field(min_length=4, max_length=4)
+
+
 class StandingView(BaseModel):
     model_config = ConfigDict(frozen=True)
 
@@ -107,6 +126,19 @@ class ManagerTeamView(BaseModel):
     bullpen: list[RosterCardView]
     tier_counts: dict[str, int]
     available_bullpen_card_ids: list[str]
+    rotation_plan: list[str]
+    cost_limit: int | None
+    ssr_limit: int | None
+    unlimited_roster: bool
+
+
+class ManagerPlayerStatView(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    card_id: str
+    player_name: str
+    kind: str
+    values: dict[str, int | float | str]
 
 
 class ManagerViewResponse(BaseModel):
@@ -121,6 +153,8 @@ class ManagerViewResponse(BaseModel):
     catalog_snapshot_version: str
     catalog_fingerprint: str
     seed: int
+    season_year: int
+    user_team_id: str
     games_completed: int
     total_games: int
     finished: bool
@@ -128,6 +162,7 @@ class ManagerViewResponse(BaseModel):
     standings: list[StandingView]
     teams: list[ManagerTeamView]
     recent_results: list[ResultView]
+    player_stats: list[ManagerPlayerStatView]
 
 
 class ManagerListResponse(BaseModel):

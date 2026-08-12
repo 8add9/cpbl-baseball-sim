@@ -85,7 +85,7 @@ def test_initial_selection_follows_rotation_and_bullpen_uses_card_id_order() -> 
     assert available_bullpen(state) == tuple(sorted(bullpen))
 
 
-def test_four_sp_rotation_requires_four_team_games_between_starts() -> None:
+def test_four_sp_rotation_cycles_by_default() -> None:
     state, rotation, _bullpen = _fixture()
     for starter in rotation:
         assert select_next_starter(state) == starter
@@ -96,13 +96,12 @@ def test_four_sp_rotation_requires_four_team_games_between_starts() -> None:
     assert dict(state.last_start_games)[rotation[0]] == 5
 
 
-def test_short_rest_start_is_rejected_without_mutating_state() -> None:
+def test_v01_allows_selecting_the_same_sp_in_consecutive_games() -> None:
     state, rotation, _bullpen = _fixture()
     state = apply_pitcher_usage(state, _event(state, rotation[0]))
-    before = state
-    with pytest.raises(ValueError, match="rested four"):
-        apply_pitcher_usage(state, _event(state, rotation[0]))
-    assert state == before
+    state = apply_pitcher_usage(state, _event(state, rotation[0]))
+    assert dict(state.last_start_games)[rotation[0]] == 2
+    assert select_next_starter(state, rotation[0]) == rotation[0]
 
 
 def test_reliever_may_pitch_twice_then_must_rest_and_unused_resets_streak() -> None:

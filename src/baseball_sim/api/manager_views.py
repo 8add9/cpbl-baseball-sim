@@ -5,12 +5,14 @@ from __future__ import annotations
 from collections import Counter
 
 from baseball_sim.manager.cards import CardCatalog, CatalogEntry
+from baseball_sim.manager.customization import roster_limits_for_name
 from baseball_sim.manager.roster import evaluate_roster
-from baseball_sim.manager.usage import available_bullpen, select_next_starter
+from baseball_sim.manager.usage import available_bullpen
 
 from .manager_repository import ManagerRecord
 from .manager_schemas import (
     LineupCardView,
+    ManagerPlayerStatView,
     ManagerTeamView,
     ManagerViewResponse,
     ResultView,
@@ -44,11 +46,21 @@ def roster_card_view(entry: CatalogEntry) -> RosterCardView:
 def manager_view(record: ManagerRecord, catalog: CardCatalog) -> ManagerViewResponse:
     state = record.state
     next_game = state.next_game
+    assert state.franchise is not None
+    entitlements = {item.team_id: item for item in state.franchise.entitlements}
+    rotation_plans = dict(state.rotation_plans)
     teams: list[ManagerTeamView] = []
     for team_state in state.teams:
         config = team_state.config
         selection = config.roster
+        entitlement = entitlements[config.team_id]
+        limits = roster_limits_for_name(
+            config.name or config.team_id,
+            cost_bonus=entitlement.cost_budget_bonus,
+            ssr_bonus=entitlement.ssr_cap_bonus,
+        )
         legality = evaluate_roster(catalog, selection)
+        rotation_plan = rotation_plans[config.team_id]
         lineup_ids = {entry.card_id for entry in config.lineup}
         lineup: list[LineupCardView] = []
         for lineup_entry in config.lineup:
@@ -81,9 +93,9 @@ def manager_view(record: ManagerRecord, catalog: CardCatalog) -> ManagerViewResp
                 batter_count=len(selection.batter_card_ids),
                 rotation_count=len(selection.rotation_card_ids),
                 bullpen_count=len(selection.bullpen_card_ids),
-                next_starter_card_id=select_next_starter(
-                    team_state.pitcher_availability
-                ),
+                next_starter_card_id=rotation_plan[
+                    team_state.pitcher_availability.team_games_played % 4
+                ],
                 lineup=lineup,
                 bench=[
                     roster_card_view(catalog.get(card_id))
@@ -102,6 +114,58 @@ def manager_view(record: ManagerRecord, catalog: CardCatalog) -> ManagerViewResp
                 available_bullpen_card_ids=list(
                     available_bullpen(team_state.pitcher_availability)
                 ),
+                rotation_plan=list(rotation_plan),
+                cost_limit=limits.cost_limit,
+                ssr_limit=limits.ssr_limit,
+                unlimited_roster=limits.unlimited,
+            )
+        )
+    player_stats: list[ManagerPlayerStatView] = []
+    for item in state.player_stats:
+        card = catalog.get(item.card_id).card
+        if item.batter is not None:
+            batter_line = item.batter
+            values: dict[str, int | float | str] = {
+                "G": batter_line.games,
+                "PA": batter_line.pa,
+                "AB": batter_line.ab,
+                "H": batter_line.hits,
+                "2B": batter_line.doubles,
+                "3B": batter_line.triples,
+                "HR": batter_line.home_runs,
+                "BB": batter_line.walks,
+                "HBP": batter_line.hbp,
+                "SO": batter_line.strikeouts,
+                "AVG": batter_line.avg,
+                "OBP": batter_line.obp,
+                "SLG": batter_line.slg,
+                "OPS": batter_line.ops,
+            }
+            kind = "batter"
+        else:
+            assert item.pitcher is not None
+            pitcher_line = item.pitcher
+            values = {
+                "G": pitcher_line.games,
+                "GS": pitcher_line.games_started,
+                "IP": pitcher_line.innings_pitched,
+                "BF": pitcher_line.batters_faced,
+                "H": pitcher_line.hits,
+                "HR": pitcher_line.home_runs,
+                "BB": pitcher_line.walks,
+                "HBP": pitcher_line.hbp,
+                "SO": pitcher_line.strikeouts,
+                "R": pitcher_line.runs,
+                "RA9": pitcher_line.runs_allowed_per_nine,
+                "WHIP": pitcher_line.whip,
+            }
+            kind = "pitcher"
+        player_stats.append(
+            ManagerPlayerStatView(
+                card_id=item.card_id,
+                player_name=card.player_name,
+                kind=kind,
+                values=values,
             )
         )
     return ManagerViewResponse(
@@ -114,6 +178,8 @@ def manager_view(record: ManagerRecord, catalog: CardCatalog) -> ManagerViewResp
         catalog_snapshot_version=catalog.snapshot_version,
         catalog_fingerprint=catalog.fingerprint,
         seed=state.seed,
+        season_year=state.season_year,
+        user_team_id=state.user_team_id,
         games_completed=len(state.results),
         total_games=len(state.schedule),
         finished=state.finished,
@@ -152,4 +218,5 @@ def manager_view(record: ManagerRecord, catalog: CardCatalog) -> ManagerViewResp
             )
             for result in state.results[-10:]
         ],
+        player_stats=player_stats,
     )

@@ -25,12 +25,17 @@ from baseball_sim.career import (
     next_pa as play_next_career_pa,
 )
 from baseball_sim.manager.cards import CatalogEntry
+from baseball_sim.manager.game_roster import LineupEntry
 from baseball_sim.manager.league_service import (
+    advance_manager_season,
     create_ai_league,
+    rename_user_team,
     replace_team_card,
     simulate_league_round,
     simulate_league_season,
     simulate_next_league_game,
+    update_user_lineup,
+    update_user_rotation_plan,
 )
 from baseball_sim.ratings.mapping import rating_display
 
@@ -70,7 +75,10 @@ from .manager_schemas import (
     ManagerListResponse,
     ManagerMutationRequest,
     ManagerViewResponse,
+    RenameManagerTeamRequest,
     ReplaceManagerCardRequest,
+    UpdateManagerLineupRequest,
+    UpdateManagerRotationRequest,
 )
 from .manager_views import manager_view, roster_card_view
 from .repository import (
@@ -739,6 +747,62 @@ def create_app(
         )
         return manager_view(record, backend.catalog)
 
+    @application.post(
+        "/api/managers/{manager_id}/rename-team",
+        response_model=ManagerViewResponse,
+    )
+    def rename_manager_team_endpoint(
+        manager_id: str, request: RenameManagerTeamRequest
+    ) -> ManagerViewResponse:
+        backend = manager_backend()
+        record = backend.mutate(
+            manager_id=manager_id,
+            operation_id=request.operation_id,
+            action="rename-team",
+            expected_revision=request.expected_revision,
+            request_payload=request.model_dump(mode="json"),
+            operation=lambda state, _catalog: rename_user_team(state, request.name),
+        )
+        return manager_view(record, backend.catalog)
+
+    @application.post(
+        "/api/managers/{manager_id}/lineup",
+        response_model=ManagerViewResponse,
+    )
+    def update_manager_lineup_endpoint(
+        manager_id: str, request: UpdateManagerLineupRequest
+    ) -> ManagerViewResponse:
+        backend = manager_backend()
+        lineup = tuple(LineupEntry(item.card_id, item.position) for item in request.lineup)
+        record = backend.mutate(
+            manager_id=manager_id,
+            operation_id=request.operation_id,
+            action="update-lineup",
+            expected_revision=request.expected_revision,
+            request_payload=request.model_dump(mode="json"),
+            operation=lambda state, _catalog: update_user_lineup(state, lineup),
+        )
+        return manager_view(record, backend.catalog)
+
+    @application.post(
+        "/api/managers/{manager_id}/rotation-plan",
+        response_model=ManagerViewResponse,
+    )
+    def update_manager_rotation_endpoint(
+        manager_id: str, request: UpdateManagerRotationRequest
+    ) -> ManagerViewResponse:
+        backend = manager_backend()
+        starters = tuple(request.starter_card_ids)
+        record = backend.mutate(
+            manager_id=manager_id,
+            operation_id=request.operation_id,
+            action="update-rotation-plan",
+            expected_revision=request.expected_revision,
+            request_payload=request.model_dump(mode="json"),
+            operation=lambda state, _catalog: update_user_rotation_plan(state, starters),
+        )
+        return manager_view(record, backend.catalog)
+
     def mutate_manager(
         manager_id: str,
         request: ManagerMutationRequest,
@@ -749,6 +813,7 @@ def create_app(
             "simulate-next-game": simulate_next_league_game,
             "simulate-round": simulate_league_round,
             "simulate-season": simulate_league_season,
+            "advance-season": advance_manager_season,
         }
         record = backend.mutate(
             manager_id=manager_id,
@@ -786,6 +851,15 @@ def create_app(
         manager_id: str, request: ManagerMutationRequest
     ) -> ManagerViewResponse:
         return mutate_manager(manager_id, request, "simulate-season")
+
+    @application.post(
+        "/api/managers/{manager_id}/advance-season",
+        response_model=ManagerViewResponse,
+    )
+    def advance_manager_season_endpoint(
+        manager_id: str, request: ManagerMutationRequest
+    ) -> ManagerViewResponse:
+        return mutate_manager(manager_id, request, "advance-season")
 
     return application
 

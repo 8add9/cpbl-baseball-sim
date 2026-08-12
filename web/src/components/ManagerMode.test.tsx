@@ -24,13 +24,15 @@ const team = {
   bullpen: [5, 6, 7, 8, 9].map(index => pitcher(index, index < 8 ? 'RP' : 'Swingman')),
   tier_counts: { N: 21, R: 0, SR: 1, SSR: 0 },
   available_bullpen_card_ids: ['p-5', 'p-6', 'p-7', 'p-8', 'p-9'],
+  rotation_plan: ['p-1', 'p-2', 'p-3', 'p-4'],
+  cost_limit: 70, ssr_limit: 2, unlimited_roster: false,
 }
 const manager = {
   manager_id: '11111111-1111-4111-8111-111111111111', revision: 1,
   autosaved_at: '2026-08-12T00:00:00Z', persistence_version: 'manager-sqlite-v1',
   schema_version: 1, model_version: 'manager-league-v0.1',
   catalog_snapshot_version: 'rating-snapshot-v0.2:test', catalog_fingerprint: 'a'.repeat(64),
-  seed: 42, games_completed: 0, total_games: 360, finished: false,
+  seed: 42, season_year: 2026, user_team_id: 'team-1', games_completed: 0, total_games: 360, finished: false,
   next_game: { game_number: 1, round_number: 1, away_team_id: 'team-1', home_team_id: 'team-2' },
   standings: [1, 2, 3, 4, 5, 6].map(rank => ({
     rank, team_id: `team-${rank}`, wins: 0, losses: 0, runs_scored: 0,
@@ -38,6 +40,7 @@ const manager = {
   })),
   teams: [team, ...[2, 3, 4, 5, 6].map(index => ({ ...team, team_id: `team-${index}`, name: `AI Team ${index}` }))],
   recent_results: [],
+  player_stats: [],
 }
 
 beforeEach(() => {

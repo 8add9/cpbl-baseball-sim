@@ -13,8 +13,8 @@ class RosterRules:
     batter_count: int = 13
     rotation_count: int = 4
     bullpen_count: int = 5
-    budget: int = 70
-    max_ssr: int = 2
+    budget: int | None = 70
+    max_ssr: int | None = 2
     max_sr: int = 5
     minimum_relief_pitchers: int = 3
 
@@ -26,17 +26,19 @@ class RosterRules:
             self.batter_count,
             self.rotation_count,
             self.bullpen_count,
-            self.budget,
             self.minimum_relief_pitchers,
         ) <= 0:
-            raise ValueError("roster counts and budget must be positive")
-        if self.max_ssr < 0 or self.max_sr < 0:
+            raise ValueError("roster counts must be positive")
+        if self.budget is not None and self.budget <= 0:
+            raise ValueError("roster budget must be positive when limited")
+        if (self.max_ssr is not None and self.max_ssr < 0) or self.max_sr < 0:
             raise ValueError("tier caps cannot be negative")
         if self.minimum_relief_pitchers > self.bullpen_count:
             raise ValueError("minimum RP cannot exceed bullpen size")
 
 
 DEFAULT_ROSTER_RULES = RosterRules()
+EXPANDED_ROSTER_RULES = RosterRules(roster_size=28, batter_count=19)
 
 
 @dataclass(frozen=True, slots=True)
@@ -94,14 +96,14 @@ def evaluate_roster(
     rules: RosterRules = DEFAULT_ROSTER_RULES,
 ) -> RosterLegality:
     violations: list[str] = []
-    if len(selection.batter_card_ids) != rules.batter_count:
-        violations.append(f"roster requires exactly {rules.batter_count} batters")
+    if len(selection.batter_card_ids) < rules.batter_count:
+        violations.append(f"roster requires at least {rules.batter_count} batters")
     if len(selection.rotation_card_ids) != rules.rotation_count:
         violations.append(f"rotation requires exactly {rules.rotation_count} starters")
     if len(selection.bullpen_card_ids) != rules.bullpen_count:
         violations.append(f"bullpen requires exactly {rules.bullpen_count} pitchers")
-    if len(selection.all_card_ids) != rules.roster_size:
-        violations.append(f"roster requires exactly {rules.roster_size} cards")
+    if len(selection.all_card_ids) < rules.roster_size:
+        violations.append(f"roster requires at least {rules.roster_size} cards")
     if len(set(selection.all_card_ids)) != len(selection.all_card_ids):
         violations.append("a card may appear only once")
 
@@ -146,18 +148,16 @@ def evaluate_roster(
     )
     if len(bullpen_entries) == rules.bullpen_count and relief_count < rules.minimum_relief_pitchers:
         violations.append(f"bullpen requires at least {rules.minimum_relief_pitchers} RP cards")
-    if len(batter_entries) == rules.batter_count and not _can_fill_position_slots(
-        tuple(batter_entries)
-    ):
-        violations.append("batters cannot fill 2C, 1B/2B/3B/SS, and four OF slots distinctly")
+    # Bench composition is deliberately unrestricted in Manager v0.1. Exact defensive
+    # position legality belongs to the selected starting nine in create_team_game_roster.
 
     competitive_entries = [entry for entry in entries if entry.cost is not None]
     total_cost = sum(entry.cost or 0 for entry in competitive_entries)
     sr_count = sum(entry.tier is Tier.SR for entry in competitive_entries)
     ssr_count = sum(entry.tier is Tier.SSR for entry in competitive_entries)
-    if total_cost > rules.budget:
+    if rules.budget is not None and total_cost > rules.budget:
         violations.append(f"roster cost {total_cost} exceeds budget {rules.budget}")
-    if ssr_count > rules.max_ssr:
+    if rules.max_ssr is not None and ssr_count > rules.max_ssr:
         violations.append(f"SSR count {ssr_count} exceeds cap {rules.max_ssr}")
     if sr_count > rules.max_sr:
         violations.append(f"SR count {sr_count} exceeds cap {rules.max_sr}")

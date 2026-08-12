@@ -167,13 +167,23 @@ def test_season_completion_rolls_back_invalid_mutation_and_list_skips_corrupt(
     assert sum(row["wins"] for row in finished["standings"]) == 360
     assert sum(row["losses"] for row in finished["standings"]) == 360
 
+    advanced_response = client.post(
+        f"/api/managers/{manager_id}/advance-season",
+        json=_mutation(finished, "advance-season"),
+    )
+    assert advanced_response.status_code == 200
+    advanced = advanced_response.json()
+    assert advanced["season_year"] == finished["season_year"] + 1
+    assert advanced["games_completed"] == 0
+    assert advanced["finished"] is False
+
     rejected = client.post(
         f"/api/managers/{manager_id}/simulate-next-game",
-        json=_mutation(finished, "after-season"),
+        json={"expected_revision": finished["revision"], "operation_id": "stale-after-season"},
     )
-    assert rejected.status_code == 422
+    assert rejected.status_code == 409
     current = client.get(f"/api/managers/{manager_id}").json()
-    assert current == finished
+    assert current == advanced
 
     corrupt_id = str(uuid4())
     with sqlite3.connect(database) as connection:
@@ -259,3 +269,52 @@ def test_preseason_roster_builder_rejects_star_overload_accepts_legal_swap_and_l
     )
     assert locked.status_code == 422
     assert "locked" in locked.json()["message"]
+
+
+def test_team_8add9_unlocks_caps_and_rotation_allows_same_starter(
+    tmp_path: Path,
+) -> None:
+    database = tmp_path / "managers.sqlite3"
+    client = _client(database)
+    view = _create(client, "custom-create")
+    manager_id = view["manager_id"]
+    user_team = next(
+        team for team in view["teams"] if team["team_id"] == view["user_team_id"]
+    )
+
+    renamed_response = client.post(
+        f"/api/managers/{manager_id}/rename-team",
+        json={**_mutation(view, "rename-8add9"), "name": "8add9"},
+    )
+    assert renamed_response.status_code == 200
+    renamed = renamed_response.json()
+    renamed_team = next(
+        team
+        for team in renamed["teams"]
+        if team["team_id"] == renamed["user_team_id"]
+    )
+    assert renamed_team["name"] == "8add9"
+    assert renamed_team["unlimited_roster"] is True
+    assert renamed_team["cost_limit"] is None
+    assert renamed_team["ssr_limit"] is None
+
+    starter = user_team["rotation"][0]["card_id"]
+    rotation_response = client.post(
+        f"/api/managers/{manager_id}/rotation-plan",
+        json={
+            **_mutation(renamed, "same-starter"),
+            "starter_card_ids": [starter] * 4,
+        },
+    )
+    assert rotation_response.status_code == 200
+    rotated = rotation_response.json()
+    rotated_team = next(
+        team
+        for team in rotated["teams"]
+        if team["team_id"] == rotated["user_team_id"]
+    )
+    assert rotated_team["rotation_plan"] == [starter] * 4
+    assert rotated_team["next_starter_card_id"] == starter
+
+    restarted = _client(database)
+    assert restarted.get(f"/api/managers/{manager_id}").json() == rotated

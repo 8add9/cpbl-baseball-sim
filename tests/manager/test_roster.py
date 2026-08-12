@@ -139,7 +139,17 @@ def test_budget_and_ssr_caps_are_reported_independently() -> None:
     assert any("SSR count" in item for item in capped.violations)
 
 
-def test_positions_are_distinct_assignments_not_one_utility_player() -> None:
+def test_unlimited_rules_skip_only_cost_and_ssr_caps() -> None:
+    catalog, selection, _cards = _fixture()
+    result = evaluate_roster(
+        catalog,
+        selection,
+        RosterRules(budget=None, max_ssr=None),
+    )
+    assert result.legal
+
+
+def test_bench_position_composition_is_unrestricted_at_roster_level() -> None:
     catalog, selection, _cards = _fixture()
     replacement = _batter(99, "DH")
     expanded = CardCatalog(
@@ -150,8 +160,23 @@ def test_positions_are_distinct_assignments_not_one_utility_player() -> None:
         batter_card_ids=(replacement.card_id, *selection.batter_card_ids[1:]),
     )
     result = evaluate_roster(expanded, invalid)
-    assert not result.legal
-    assert any("2C" in violation for violation in result.violations)
+    assert result.legal
+
+
+def test_all_four_bench_batters_may_share_the_same_position() -> None:
+    catalog, selection, _cards = _fixture()
+    reserve_ids = tuple(
+        entry.card.card_id
+        for entry in catalog.entries()
+        if entry.card.player_id.startswith("b20")
+    )[:4]
+    same_position_bench = replace(
+        selection,
+        batter_card_ids=selection.batter_card_ids[:9] + reserve_ids,
+    )
+    assert len(reserve_ids) == 4
+    assert all(catalog.get(card_id).card.profile_positions == ("DH",) for card_id in reserve_ids)
+    assert evaluate_roster(catalog, same_position_bench).legal
 
 
 def test_rotation_bullpen_roles_and_minimum_three_relief_pitchers() -> None:

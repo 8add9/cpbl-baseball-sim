@@ -1,14 +1,15 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   createManager, listManagerRosterCandidates, listManagers, ManagerCard,
-  ManagerLineupCard, ManagerTeam, ManagerView, mutateManager, replaceManagerCard,
+  ManagerLineupCard, ManagerTeam, ManagerView, mutateManager, renameManagerTeam,
+  replaceManagerCard, updateManagerLineup, updateManagerRotation,
 } from '../api'
 
-type ManagerAction = 'simulate-next-game' | 'simulate-round' | 'simulate-season'
-type ManagerTab = 'roster' | 'catalog' | 'standings' | 'schedule'
+type ManagerAction = 'simulate-next-game' | 'simulate-round' | 'simulate-season' | 'advance-season'
+type ManagerTab = 'roster' | 'catalog' | 'standings' | 'stats'
 
 const TABS: Array<[ManagerTab, string]> = [
-  ['roster', '陣容'], ['catalog', '球員目錄'], ['standings', '戰績'], ['schedule', '賽程'],
+  ['roster', '陣容'], ['catalog', '球員目錄'], ['standings', '戰績'], ['stats', '球員數據'],
 ]
 
 function formatPct(value: number) {
@@ -24,18 +25,23 @@ function CardRatings({ card }: { card: ManagerCard | ManagerLineupCard }) {
   </div>
 }
 
-function RosterTable({ team, onSelect }: {
+function RosterTable({ team, onSelect, onMove, disabled }: {
   team: ManagerTeam; onSelect: (card: ManagerLineupCard) => void
+  onMove: (index: number, delta: number) => void; disabled: boolean
 }) {
   return <section className="manager-panel manager-lineup">
     <div className="manager-section-title"><h2>先發打線</h2><span>9 人</span></div>
     <div className="manager-table manager-lineup-table" role="table">
       <div className="manager-table-head" role="row">
-        <span>#</span><span>位置</span><span>球員</span><span>年度</span><span>級別</span><span>成本</span>
+        <span>#</span><span>位置</span><span>球員</span><span>年度</span><span>級別</span><span>排序</span>
       </div>
       {team.lineup.map((card, index) => <button role="row" key={card.card_id} onClick={() => onSelect(card)}>
         <span>{index + 1}</span><strong>{card.position}</strong><span>{card.player_name}</span>
-        <span>{card.season_year}</span><em data-tier={card.tier}>{card.tier}</em><span>{card.cost}</span>
+        <span>{card.season_year}</span><em data-tier={card.tier}>{card.tier}</em>
+        <span className="manager-order-buttons">
+          <i role="button" aria-label={`上移 ${card.player_name}`} onClick={event => { event.stopPropagation(); onMove(index, -1) }} aria-disabled={disabled || index === 0}>↑</i>
+          <i role="button" aria-label={`下移 ${card.player_name}`} onClick={event => { event.stopPropagation(); onMove(index, 1) }} aria-disabled={disabled || index === team.lineup.length - 1}>↓</i>
+        </span>
       </button>)}
     </div>
   </section>
@@ -57,6 +63,7 @@ function CompactRoster({ title, cards, nextStarter, available }: {
 }
 
 function Standings({ manager }: { manager: ManagerView }) {
+  const names = Object.fromEntries(manager.teams.map(team => [team.team_id, team.name]))
   return <section className="manager-panel manager-standings">
     <div className="manager-section-title"><h2>聯盟戰績</h2><span>{manager.games_completed} / {manager.total_games}</span></div>
     <div className="manager-table" role="table">
@@ -64,8 +71,20 @@ function Standings({ manager }: { manager: ManagerView }) {
         <span>#</span><span>球隊</span><span>W</span><span>L</span><span>PCT</span><span>GB</span>
       </div>
       {manager.standings.map(row => <div className="standings-row" role="row" key={row.team_id}>
-        <strong>{row.rank}</strong><span>{row.team_id}</span><span>{row.wins}</span><span>{row.losses}</span>
+        <strong>{row.rank}</strong><span>{names[row.team_id] ?? row.team_id}</span><span>{row.wins}</span><span>{row.losses}</span>
         <span>{formatPct(row.winning_percentage)}</span><span>{row.games_behind || '—'}</span>
+      </div>)}
+    </div>
+  </section>
+}
+
+function PlayerStats({ manager }: { manager: ManagerView }) {
+  return <section className="manager-panel manager-player-stats">
+    <div className="manager-section-title"><h2>{manager.season_year} 球員數據</h2><span>{manager.player_stats.length} 人</span></div>
+    <div className="manager-stats-scroll">
+      {manager.player_stats.length === 0 ? <p>尚無本季出賽數據</p> : manager.player_stats.map(item => <div key={item.card_id}>
+        <strong>{item.player_name}</strong><small>{item.kind === 'batter' ? '打者' : '投手'}</small>
+        <span>{Object.entries(item.values).map(([key, value]) => `${key} ${typeof value === 'number' && !Number.isInteger(value) ? value.toFixed(3) : value}`).join(' · ')}</span>
       </div>)}
     </div>
   </section>
@@ -82,6 +101,7 @@ export function ManagerMode({ onBack }: { onBack: () => void }) {
   const [busy, setBusy] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [teamName, setTeamName] = useState('')
 
   const accept = (next: ManagerView) => {
     setManager(next)
@@ -109,6 +129,7 @@ export function ManagerMode({ onBack }: { onBack: () => void }) {
     () => manager?.teams.find(item => item.team_id === selectedTeamId) ?? manager?.teams[0] ?? null,
     [manager, selectedTeamId],
   )
+  useEffect(() => { setTeamName(team?.name ?? '') }, [team?.name])
   async function createLeague() {
     setBusy(true); setError('')
     try { accept(await createManager()) }
@@ -121,6 +142,36 @@ export function ManagerMode({ onBack }: { onBack: () => void }) {
     setBusy(true); setError('')
     try { accept(await mutateManager(manager, action)) }
     catch (reason) { setError(reason instanceof Error ? reason.message : '模擬失敗') }
+    finally { setBusy(false) }
+  }
+
+  async function saveTeamName() {
+    if (!manager || !teamName.trim()) return
+    setBusy(true); setError('')
+    try { accept(await renameManagerTeam(manager, teamName.trim())) }
+    catch (reason) { setError(reason instanceof Error ? reason.message : '球隊名稱更新失敗') }
+    finally { setBusy(false) }
+  }
+
+  async function moveLineup(index: number, delta: number) {
+    if (!manager || !team || manager.games_completed > 0) return
+    const target = index + delta
+    if (target < 0 || target >= team.lineup.length) return
+    const lineup = [...team.lineup]
+    ;[lineup[index], lineup[target]] = [lineup[target], lineup[index]]
+    setBusy(true); setError('')
+    try { accept(await updateManagerLineup(manager, lineup)) }
+    catch (reason) { setError(reason instanceof Error ? reason.message : '棒次更新失敗') }
+    finally { setBusy(false) }
+  }
+
+  async function changeRotation(slot: number, cardId: string) {
+    if (!manager || !team || manager.games_completed > 0) return
+    const plan = [...team.rotation_plan]
+    plan[slot] = cardId
+    setBusy(true); setError('')
+    try { accept(await updateManagerRotation(manager, plan)) }
+    catch (reason) { setError(reason instanceof Error ? reason.message : '輪值更新失敗') }
     finally { setBusy(false) }
   }
 
@@ -168,7 +219,7 @@ export function ManagerMode({ onBack }: { onBack: () => void }) {
     </header>
     {error ? <div className="error-banner" role="alert">{error}</div> : null}
     <section className="manager-summary">
-      <div><span>球隊預算</span><strong>{team?.roster_cost ?? 0} <small>/ 70</small></strong></div>
+      <div><span>球隊預算</span><strong>{team?.roster_cost ?? 0} <small>/ {team?.cost_limit ?? '∞'}</small></strong></div>
       <div className="manager-next"><span>下一場</span><strong>{next ? `${next.away_team_id}  VS  ${next.home_team_id}` : '球季結束'}</strong>
         <small>{next ? `第 ${next.round_number} 輪 · Game ${next.game_number}` : `${manager.total_games} 場完成`}</small></div>
       <label>目前球隊<select value={team?.team_id ?? ''} onChange={event => {
@@ -179,6 +230,11 @@ export function ManagerMode({ onBack }: { onBack: () => void }) {
         const selected = saves.find(item => item.manager_id === event.target.value); if (selected) accept(selected)
       }}>{saves.map(item => <option value={item.manager_id} key={item.manager_id}>rev {item.revision} · {item.games_completed} 場</option>)}</select></label>
     </section>
+    {team?.team_id === manager.user_team_id ? <section className="manager-customize-bar">
+      <label>球隊名稱<input value={teamName} maxLength={40} onChange={event => setTeamName(event.target.value)} /></label>
+      <button disabled={busy || teamName.trim() === team.name} onClick={saveTeamName}>儲存名稱</button>
+      {team.unlimited_roster ? <strong>8add9 特權：Cost 與 SSR 無上限</strong> : null}
+    </section> : null}
     <nav className="manager-tabs" aria-label="經理模式檢視">{TABS.map(([value, label]) =>
       <button className={tab === value ? 'active' : ''} onClick={() => setTab(value)} key={value}>{label}</button>)}</nav>
     <div className={`manager-dashboard tab-${tab}`}>
@@ -204,16 +260,21 @@ export function ManagerMode({ onBack }: { onBack: () => void }) {
       </aside>
       <section className="manager-roster-column">
         <div className="manager-budget"><div><span>我的球隊</span><strong>{team?.name}</strong></div>
-          <div><span>SSR</span><strong>{team?.tier_counts.SSR ?? 0} / 2</strong></div>
+          <div><span>SSR</span><strong>{team?.tier_counts.SSR ?? 0} / {team?.ssr_limit ?? '∞'}</strong></div>
           <div><span>SR</span><strong>{team?.tier_counts.SR ?? 0} / 5</strong></div></div>
-        {team ? <RosterTable team={team} onSelect={setSelectedCard} /> : null}
+        {team ? <RosterTable team={team} onSelect={setSelectedCard} onMove={moveLineup} disabled={busy || manager.games_completed > 0} /> : null}
         {team ? <div className="manager-groups">
           <CompactRoster title="替補球員" cards={team.bench} />
-          <CompactRoster title="先發輪值" cards={team.rotation} nextStarter={team.next_starter_card_id} />
+          <section className="manager-roster-group"><div className="manager-section-title"><h3>先發輪值</h3><span>可重複同一投手</span></div>
+            {team.rotation_plan.map((cardId, index) => <label key={index}>第 {index + 1} 號
+              <select disabled={busy || manager.games_completed > 0} value={cardId} onChange={event => changeRotation(index, event.target.value)}>
+                {team.rotation.map(card => <option key={card.card_id} value={card.card_id}>{card.player_name} ({card.season_year})</option>)}
+              </select></label>)}
+          </section>
           <CompactRoster title="牛棚投手" cards={team.bullpen} available={available} />
         </div> : null}
       </section>
-      <aside className="manager-league-column"><Standings manager={manager} />
+      <aside className="manager-league-column">{tab === 'stats' ? <PlayerStats manager={manager} /> : <Standings manager={manager} />}
         <section className="manager-panel manager-recent"><div className="manager-section-title"><h2>最近戰績</h2><span>近 10 場</span></div>
           {manager.recent_results.length ? manager.recent_results.slice().reverse().map(result => <div key={result.game_number}>
             <span>G{result.game_number}</span><strong>{result.away_team_id} {result.away_runs}–{result.home_runs} {result.home_team_id}</strong></div>) : <p>尚未進行比賽</p>}</section>
@@ -223,6 +284,7 @@ export function ManagerMode({ onBack }: { onBack: () => void }) {
       <button disabled={busy || manager.finished} onClick={() => act('simulate-next-game')}>▶ <span>模擬下一場<small>進行下一場比賽</small></span></button>
       <button disabled={busy || manager.finished} onClick={() => act('simulate-round')}>▶▶ <span>模擬下一輪<small>完成本輪賽程</small></span></button>
       <button disabled={busy || manager.finished} onClick={() => act('simulate-season')}>▶▶▶ <span>模擬剩餘球季<small>進行至 360 場</small></span></button>
+      <button disabled={busy || !manager.finished} onClick={() => act('advance-season')}>＋ <span>下一個賽季<small>結算排名獎勵</small></span></button>
     </section>
   </main>
 }

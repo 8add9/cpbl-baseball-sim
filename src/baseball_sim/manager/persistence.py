@@ -2,21 +2,41 @@
 
 from __future__ import annotations
 
+from dataclasses import asdict, dataclass
 from typing import Any, cast
 
 from .cards import CardCatalog
+from .franchise import (
+    ManagerFranchise,
+    RewardGrant,
+    SeasonPlacement,
+    TeamEntitlement,
+)
 from .game_roster import LineupEntry, create_team_game_roster
 from .league import (
     MANAGER_LEAGUE_VERSION,
     ManagerLeagueState,
+    ManagerSeasonArchive,
     ManagerTeamConfig,
     ManagerTeamState,
 )
+from .player_stats import BatterStatLine, PitcherStatLine, PlayerSeasonStat
 from .roster import RosterSelection
 from .season import GameResult, generate_schedule
 from .usage import PitcherAvailability
 
-MANAGER_SAVE_SCHEMA_VERSION = 1
+MANAGER_SAVE_SCHEMA_VERSION = 2
+
+
+@dataclass(frozen=True, slots=True)
+class _LoadedV2:
+    season_year: int
+    user_team_id: str
+    rotation_plans: tuple[tuple[str, tuple[str, ...]], ...]
+    franchise: ManagerFranchise
+    player_stats: tuple[PlayerSeasonStat, ...]
+    settled_game_ids: tuple[str, ...]
+    season_history: tuple[ManagerSeasonArchive, ...]
 
 
 def manager_state_to_dict(state: ManagerLeagueState) -> dict[str, object]:
@@ -26,6 +46,33 @@ def manager_state_to_dict(state: ManagerLeagueState) -> dict[str, object]:
         "seed": state.seed,
         "catalog_snapshot_version": state.catalog.snapshot_version,
         "catalog_fingerprint": state.catalog.fingerprint,
+        "season_year": state.season_year,
+        "user_team_id": state.user_team_id,
+        "rotation_plans": [
+            [team_id, list(plan)] for team_id, plan in state.rotation_plans
+        ],
+        "franchise": {
+            "version": state.franchise.version,
+            "active_season_year": state.franchise.active_season_year,
+            "team_ids": list(state.franchise.team_ids),
+            "history": [asdict(item) for item in state.franchise.history],
+            "reward_grants": [asdict(item) for item in state.franchise.reward_grants],
+            "entitlements": [asdict(item) for item in state.franchise.entitlements],
+        }
+        if state.franchise is not None
+        else None,
+        "player_stats": [_player_stat_to_dict(item) for item in state.player_stats],
+        "settled_game_ids": list(state.settled_game_ids),
+        "season_history": [
+            {
+                "season_year": archive.season_year,
+                "results": [_result_to_dict(item) for item in archive.results],
+                "player_stats": [
+                    _player_stat_to_dict(item) for item in archive.player_stats
+                ],
+            }
+            for archive in state.season_history
+        ],
         "teams": [
             {
                 "team_id": team.config.team_id,
@@ -53,16 +100,27 @@ def manager_state_to_dict(state: ManagerLeagueState) -> dict[str, object]:
             }
             for team in state.teams
         ],
-        "results": [
-            {
-                "game_number": result.game_number,
-                "away_team_id": result.away_team_id,
-                "home_team_id": result.home_team_id,
-                "away_runs": result.away_runs,
-                "home_runs": result.home_runs,
-            }
-            for result in state.results
-        ],
+        "results": [_result_to_dict(result) for result in state.results],
+    }
+
+
+def _result_to_dict(result: GameResult) -> dict[str, object]:
+    return {
+        "game_number": result.game_number,
+        "away_team_id": result.away_team_id,
+        "home_team_id": result.home_team_id,
+        "away_runs": result.away_runs,
+        "home_runs": result.home_runs,
+    }
+
+
+def _player_stat_to_dict(item: PlayerSeasonStat) -> dict[str, object]:
+    return {
+        "card_id": item.card_id,
+        "season_year": item.season_year,
+        "batter": None if item.batter is None else asdict(item.batter),
+        "pitcher": None if item.pitcher is None else asdict(item.pitcher),
+        "version": item.version,
     }
 
 
@@ -99,7 +157,8 @@ def _pairs(
 
 def manager_state_from_dict(value: object, catalog: CardCatalog) -> ManagerLeagueState:
     root = _dict(value, "Manager save")
-    if root.get("schema_version") != MANAGER_SAVE_SCHEMA_VERSION:
+    schema_version = root.get("schema_version")
+    if schema_version not in {1, MANAGER_SAVE_SCHEMA_VERSION}:
         raise ValueError("unsupported Manager save schema")
     if root.get("model_version") != MANAGER_LEAGUE_VERSION:
         raise ValueError("unsupported Manager league model")
@@ -168,17 +227,7 @@ def manager_state_from_dict(value: object, catalog: CardCatalog) -> ManagerLeagu
         )
         states.append(ManagerTeamState(config, usage))
 
-    results = tuple(
-        GameResult(
-            int(data["game_number"]),
-            str(data["away_team_id"]),
-            str(data["home_team_id"]),
-            int(data["away_runs"]),
-            int(data["home_runs"]),
-        )
-        for item in results_raw
-        for data in [_dict(item, "Manager result")]
-    )
+    results = tuple(_load_result(item) for item in results_raw)
     participation = {state.config.team_id: 0 for state in states}
     for result in results:
         participation[result.away_team_id] = participation.get(result.away_team_id, -1) + 1
@@ -190,6 +239,16 @@ def manager_state_from_dict(value: object, catalog: CardCatalog) -> ManagerLeagu
         raise ValueError("Manager save result and pitcher-usage counts disagree")
     seed = int(root["seed"])
     team_ids = tuple(state.config.team_id for state in states)
+    if schema_version == 1:
+        return ManagerLeagueState(
+            catalog=catalog,
+            seed=seed,
+            teams=tuple(states),
+            schedule=generate_schedule(team_ids, seed),
+            results=results,
+            version=MANAGER_LEAGUE_VERSION,
+        )
+    extra = _load_v2_fields(root)
     return ManagerLeagueState(
         catalog=catalog,
         seed=seed,
@@ -197,4 +256,86 @@ def manager_state_from_dict(value: object, catalog: CardCatalog) -> ManagerLeagu
         schedule=generate_schedule(team_ids, seed),
         results=results,
         version=MANAGER_LEAGUE_VERSION,
+        season_year=extra.season_year,
+        user_team_id=extra.user_team_id,
+        rotation_plans=extra.rotation_plans,
+        franchise=extra.franchise,
+        player_stats=extra.player_stats,
+        settled_game_ids=extra.settled_game_ids,
+        season_history=extra.season_history,
+    )
+
+
+def _load_result(value: object) -> GameResult:
+    data = _dict(value, "Manager result")
+    return GameResult(
+        int(data["game_number"]),
+        str(data["away_team_id"]),
+        str(data["home_team_id"]),
+        int(data["away_runs"]),
+        int(data["home_runs"]),
+    )
+
+
+def _load_player_stat(value: object) -> PlayerSeasonStat:
+    data = _dict(value, "player stat")
+    batter_raw = data.get("batter")
+    pitcher_raw = data.get("pitcher")
+    return PlayerSeasonStat(
+        card_id=str(data["card_id"]),
+        season_year=int(data["season_year"]),
+        batter=None
+        if batter_raw is None
+        else BatterStatLine(**_dict(batter_raw, "batter stat")),
+        pitcher=None
+        if pitcher_raw is None
+        else PitcherStatLine(**_dict(pitcher_raw, "pitcher stat")),
+        version=str(data["version"]),
+    )
+
+
+def _load_v2_fields(root: dict[str, Any]) -> _LoadedV2:
+    franchise_raw = _dict(root["franchise"], "Manager franchise")
+    franchise = ManagerFranchise(
+        active_season_year=int(franchise_raw["active_season_year"]),
+        team_ids=_strings(franchise_raw["team_ids"], "franchise teams"),
+        history=tuple(
+            SeasonPlacement(
+                int(item["season_year"]),
+                tuple(item["ordered_team_ids"]),
+            )
+            for raw in franchise_raw["history"]
+            for item in [_dict(raw, "season placement")]
+        ),
+        reward_grants=tuple(
+            RewardGrant(**_dict(raw, "reward grant"))
+            for raw in franchise_raw["reward_grants"]
+        ),
+        entitlements=tuple(
+            TeamEntitlement(**_dict(raw, "team entitlement"))
+            for raw in franchise_raw["entitlements"]
+        ),
+        version=str(franchise_raw["version"]),
+    )
+    history: list[ManagerSeasonArchive] = []
+    for raw in root["season_history"]:
+        item = _dict(raw, "season archive")
+        history.append(
+            ManagerSeasonArchive(
+                int(item["season_year"]),
+                tuple(_load_result(result) for result in item["results"]),
+                tuple(_load_player_stat(stat) for stat in item["player_stats"]),
+            )
+        )
+    return _LoadedV2(
+        season_year=int(root["season_year"]),
+        user_team_id=str(root["user_team_id"]),
+        rotation_plans=tuple(
+            (str(item[0]), tuple(str(card_id) for card_id in item[1]))
+            for item in root["rotation_plans"]
+        ),
+        franchise=franchise,
+        player_stats=tuple(_load_player_stat(item) for item in root["player_stats"]),
+        settled_game_ids=_strings(root["settled_game_ids"], "settled games"),
+        season_history=tuple(history),
     )

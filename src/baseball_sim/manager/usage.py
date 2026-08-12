@@ -8,7 +8,6 @@ from .cards import CardCatalog, CardKind, PitcherRole
 
 ROTATION_SIZE = 4
 BULLPEN_SIZE = 5
-START_REST_GAMES = 4
 MAX_CONSECUTIVE_RELIEF_GAMES = 2
 
 
@@ -117,15 +116,9 @@ def create_pitcher_availability(
 
 
 def eligible_starters(state: PitcherAvailability) -> tuple[str, ...]:
-    """Return rested starters in cyclic rotation order with CardID as stable tie-break."""
+    """Return all four SP in configured cyclic order; v0.1 has no SP rest rule."""
 
-    last_starts = dict(state.last_start_games)
-    next_game = state.next_game_number
-    candidates: list[str] = []
-    for card_id in state.rotation_card_ids:
-        last_start = last_starts[card_id]
-        if last_start is None or next_game - last_start >= START_REST_GAMES:
-            candidates.append(card_id)
+    candidates = list(state.rotation_card_ids)
     rotation_index = {
         card_id: index for index, card_id in enumerate(state.rotation_card_ids)
     }
@@ -137,10 +130,14 @@ def eligible_starters(state: PitcherAvailability) -> tuple[str, ...]:
     return tuple(sorted(candidates, key=key))
 
 
-def select_next_starter(state: PitcherAvailability) -> str:
+def select_next_starter(
+    state: PitcherAvailability, preferred_card_id: str | None = None
+) -> str:
+    if preferred_card_id is not None:
+        if preferred_card_id not in state.rotation_card_ids:
+            raise ValueError("preferred starter must come from the four-card SP rotation")
+        return preferred_card_id
     candidates = eligible_starters(state)
-    if not candidates:
-        raise ValueError("no rested SP is available for the next game")
     return candidates[0]
 
 
@@ -164,9 +161,6 @@ def apply_pitcher_usage(
         raise ValueError("pitcher usage events must be applied in team-game order")
     if event.starting_pitcher_id not in state.rotation_card_ids:
         raise ValueError("starting pitcher must come from the four-card SP rotation")
-    if event.starting_pitcher_id not in eligible_starters(state):
-        raise ValueError("starting pitcher has not rested four team games")
-
     relievers = event.used_pitcher_ids[1:]
     unknown = set(relievers) - set(state.bullpen_card_ids)
     if unknown:

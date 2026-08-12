@@ -6,8 +6,10 @@ import hashlib
 from dataclasses import dataclass, replace
 
 from .cards import CardCatalog
+from .franchise import ManagerFranchise, advance_to_next_season, create_franchise
 from .game_roster import LineupEntry, TeamGameRoster, create_team_game_roster
 from .game_simulation import create_manager_game, simulate_manager_game
+from .player_stats import PlayerSeasonStat, game_stat_deltas, merge_player_season_stats
 from .roster import RosterSelection, evaluate_roster
 from .season import GameResult, ScheduledGame, Standings, generate_schedule
 from .usage import (
@@ -20,6 +22,13 @@ from .usage import (
 )
 
 MANAGER_LEAGUE_VERSION = "manager-league-v0.1"
+
+
+@dataclass(frozen=True, slots=True)
+class ManagerSeasonArchive:
+    season_year: int
+    results: tuple[GameResult, ...]
+    player_stats: tuple[PlayerSeasonStat, ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -57,6 +66,13 @@ class ManagerLeagueState:
     schedule: tuple[ScheduledGame, ...]
     results: tuple[GameResult, ...] = ()
     version: str = MANAGER_LEAGUE_VERSION
+    season_year: int = 2026
+    user_team_id: str = ""
+    rotation_plans: tuple[tuple[str, tuple[str, ...]], ...] = ()
+    franchise: ManagerFranchise | None = None
+    player_stats: tuple[PlayerSeasonStat, ...] = ()
+    settled_game_ids: tuple[str, ...] = ()
+    season_history: tuple[ManagerSeasonArchive, ...] = ()
 
     def __post_init__(self) -> None:
         if self.version != MANAGER_LEAGUE_VERSION:
@@ -76,6 +92,50 @@ class ManagerLeagueState:
                 or result.home_team_id != scheduled.home_team_id
             ):
                 raise ValueError("Manager results must follow the frozen schedule")
+        if not self.user_team_id:
+            object.__setattr__(self, "user_team_id", team_ids[0])
+        elif self.user_team_id not in team_ids:
+            raise ValueError("Manager user team must belong to the league")
+        if not 1990 <= self.season_year <= 9999:
+            raise ValueError("Manager season year is invalid")
+        if not self.rotation_plans:
+            object.__setattr__(
+                self,
+                "rotation_plans",
+                tuple(
+                    (team.config.team_id, team.config.roster.rotation_card_ids)
+                    for team in self.teams
+                ),
+            )
+        plans = dict(self.rotation_plans)
+        if set(plans) != set(team_ids) or len(plans) != len(self.rotation_plans):
+            raise ValueError("rotation plans must cover each Manager team once")
+        for team in self.teams:
+            plan = plans[team.config.team_id]
+            if len(plan) != 4 or not set(plan).issubset(team.config.roster.rotation_card_ids):
+                raise ValueError("rotation plan must contain four owned SP slots")
+        if self.franchise is None:
+            object.__setattr__(
+                self,
+                "franchise",
+                create_franchise(team_ids, self.season_year),
+            )
+        elif (
+            self.franchise.active_season_year != self.season_year
+            or set(self.franchise.team_ids) != set(team_ids)
+        ):
+            raise ValueError("Manager franchise does not match active league season")
+        if len(set(self.settled_game_ids)) != len(self.settled_game_ids):
+            raise ValueError("settled Manager game IDs must be unique")
+        expected_ids = tuple(
+            f"{self.season_year}:{result.game_number}" for result in self.results
+        )
+        if not self.settled_game_ids and self.results:
+            object.__setattr__(self, "settled_game_ids", expected_ids)
+        elif self.settled_game_ids != expected_ids:
+            raise ValueError("settled Manager games must match active results")
+        if any(item.season_year != self.season_year for item in self.player_stats):
+            raise ValueError("active player stats must match Manager season")
 
     @property
     def finished(self) -> bool:
@@ -124,17 +184,19 @@ def create_manager_league(
     return ManagerLeagueState(catalog, seed, tuple(states), schedule)
 
 
-def _game_seed(seed: int, scheduled: ScheduledGame) -> int:
+def _game_seed(seed: int, season_year: int, scheduled: ScheduledGame) -> int:
     payload = (
-        f"{MANAGER_LEAGUE_VERSION}:{seed}:{scheduled.game_number}:"
+        f"{MANAGER_LEAGUE_VERSION}:{seed}:{season_year}:{scheduled.game_number}:"
         f"{scheduled.away_team_id}:{scheduled.home_team_id}"
     ).encode()
     digest = hashlib.blake2b(payload, digest_size=8, person=b"mgrleague").digest()
     return int.from_bytes(digest, "big")
 
 
-def _game_roster(state: ManagerTeamState) -> tuple[TeamGameRoster, str]:
-    starter = select_next_starter(state.pitcher_availability)
+def _game_roster(
+    state: ManagerTeamState, preferred_starter: str
+) -> tuple[TeamGameRoster, str]:
+    starter = select_next_starter(state.pitcher_availability, preferred_starter)
     available = set(available_bullpen(state.pitcher_availability))
     unavailable = tuple(
         card_id
@@ -158,13 +220,22 @@ def simulate_next_league_game(state: ManagerLeagueState) -> ManagerLeagueState:
     by_id = {team.config.team_id: team for team in state.teams}
     away_state = by_id[scheduled.away_team_id]
     home_state = by_id[scheduled.home_team_id]
-    away_roster, away_starter = _game_roster(away_state)
-    home_roster, home_starter = _game_roster(home_state)
+    plans = dict(state.rotation_plans)
+    away_plan = plans[scheduled.away_team_id]
+    home_plan = plans[scheduled.home_team_id]
+    away_roster, away_starter = _game_roster(
+        away_state,
+        away_plan[away_state.pitcher_availability.team_games_played % 4],
+    )
+    home_roster, home_starter = _game_roster(
+        home_state,
+        home_plan[home_state.pitcher_availability.team_games_played % 4],
+    )
     game = simulate_manager_game(
         create_manager_game(
             away_roster,
             home_roster,
-            seed=_game_seed(state.seed, scheduled),
+            seed=_game_seed(state.seed, state.season_year, scheduled),
         )
     )
     result = GameResult(
@@ -201,7 +272,19 @@ def simulate_next_league_game(state: ManagerLeagueState) -> ManagerLeagueState:
         )
         for team in state.teams
     )
-    return replace(state, teams=updated, results=state.results + (result,))
+    settled_id = f"{state.season_year}:{scheduled.game_number}"
+    if settled_id in state.settled_game_ids:
+        raise ValueError("Manager game was already settled")
+    player_stats = state.player_stats
+    for delta in game_stat_deltas(game, state.season_year):
+        player_stats = merge_player_season_stats(player_stats, delta)
+    return replace(
+        state,
+        teams=updated,
+        results=state.results + (result,),
+        player_stats=player_stats,
+        settled_game_ids=state.settled_game_ids + (settled_id,),
+    )
 
 
 def simulate_league_games(
@@ -221,3 +304,34 @@ def simulate_manager_season(state: ManagerLeagueState) -> ManagerLeagueState:
     if state.finished:
         return state
     return simulate_league_games(state, len(state.schedule) - len(state.results))
+
+
+def start_next_manager_season(state: ManagerLeagueState) -> ManagerLeagueState:
+    if not state.finished:
+        raise ValueError("Manager season must be complete before advancing")
+    assert state.franchise is not None
+    order = tuple(row.team_id for row in state.standings.rows)
+    franchise = advance_to_next_season(state.franchise, order)
+    archive = ManagerSeasonArchive(state.season_year, state.results, state.player_stats)
+    teams = tuple(
+        ManagerTeamState(
+            team.config,
+            create_pitcher_availability(
+                state.catalog,
+                team.config.roster.rotation_card_ids,
+                team.config.roster.bullpen_card_ids,
+            ),
+        )
+        for team in state.teams
+    )
+    return ManagerLeagueState(
+        catalog=state.catalog,
+        seed=state.seed,
+        teams=teams,
+        schedule=generate_schedule(tuple(team.config.team_id for team in teams), state.seed),
+        season_year=state.season_year + 1,
+        user_team_id=state.user_team_id,
+        rotation_plans=state.rotation_plans,
+        franchise=franchise,
+        season_history=state.season_history + (archive,),
+    )
