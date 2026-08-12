@@ -84,7 +84,11 @@ ratings adapter -> versioned game rating artifacts -> pure simulation domain
 Start from completed-season CPBL league outcome probabilities. Decompose a PA hierarchically into free pass, strikeout, ball in play, then hit type. Compare log-odds, multiplicative odds, and bounded hierarchical adjustments. The accepted model must preserve probability mass and pass sensitivity, interaction, and Monte Carlo regression gates.
 ## M4 HTTP and client boundary
 
-`baseball_sim.api` is a thin FastAPI adapter over the pure game domain. It owns HTTP validation and an in-memory session repository, but never recalculates probabilities, advances runners, or queries raw SQL. Batch mutations commit only after reaching their target state.
+`baseball_sim.api` is a thin FastAPI adapter over the pure game domain. It owns HTTP
+validation and a SQLite game-session adapter, but never recalculates probabilities,
+advances runners, or queries raw SQL. Ordinary sessions persist only the fixture seed and
+outcome stream; restart recovery replays those outcomes through the same game engine.
+Batch mutations commit only after reaching their target state.
 
 `web/` is a separately deployed React/Vite client. It consumes explicit `GameView`
 responses and does not sample outcomes or calculate game rules. Network/session state
@@ -94,6 +98,9 @@ the authoritative game payload. The browser is never authoritative.
 
 ## M5 Career boundary
 
+> Career v0.3 is now a migration input. Its direct-DP and Next-PA-first product loop is
+> deprecated by the v0.4 weekly-development specification in `CAREER_MODE.md`.
+
 `baseball_sim.career` is an immutable, batter-only event-sourced domain. Created players
 own four Composite Scores; the existing mapping derives Raw and Display ratings. Career
 simulation reuses the M3 nine-inning `GameState` and counter sampler. A neutral fixture
@@ -102,6 +109,12 @@ the away leadoff slot. The complete inning, outs, bases, score, lineups, and pit
 persisted after every internal PA; only a finished game increments completed games and
 materializes the created batter's counting stats.
 Season and career rates are derived from counting totals, never averaged.
+
+Career v0.4 layers a pure weekly reducer, skill XP, soft Potential, condition, team
+status, calendar and season/offseason phases around the same M3 GameState.
+`career.approach` is the only Career probability adapter and always delegates to the
+accepted hierarchical matchup model. HTTP may submit an approach enum, never ratings,
+odds, rewards or outcomes.
 
 The HTTP adapter persists validated domain JSON inside a separate local SQLite database.
 Each mutation atomically checks an expected revision, applies one domain operation,

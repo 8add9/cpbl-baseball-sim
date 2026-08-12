@@ -55,6 +55,7 @@ from .career_schemas import (
     TrainCareerRequest,
 )
 from .career_views import career_view
+from .game_repository import GameWriteConflictError, SqliteGameRepository
 from .manager_repository import (
     ManagerCorruptError,
     ManagerNotFoundError,
@@ -159,6 +160,10 @@ def _default_manager_database() -> Path:
     return _default_career_database().with_name("managers.sqlite3")
 
 
+def _default_game_database() -> Path:
+    return _default_career_database().with_name("games.sqlite3")
+
+
 def _default_rating_artifacts() -> Path:
     configured = os.getenv("BASEBALL_SIM_RATING_ARTIFACTS")
     if configured:
@@ -171,7 +176,7 @@ def create_app(
     career_repository: SqliteCareerRepository | None = None,
     manager_repository: SqliteManagerRepository | None = None,
 ) -> FastAPI:
-    sessions = repository or InMemoryGameRepository()
+    sessions = repository or SqliteGameRepository(_default_game_database())
     careers = career_repository or SqliteCareerRepository(_default_career_database())
     application = FastAPI(title="CPBL Baseball Simulator API", version="0.1.0")
     allowed_origins = [
@@ -205,6 +210,16 @@ def create_app(
     @application.exception_handler(GameFinishedError)
     async def game_finished(_request: Request, _error: GameFinishedError) -> JSONResponse:
         body = ErrorResponse(code="game_finished", message="The game is already finished.")
+        return JSONResponse(status_code=status.HTTP_409_CONFLICT, content=body.model_dump())
+
+    @application.exception_handler(GameWriteConflictError)
+    async def game_write_conflict(
+        _request: Request, _error: GameWriteConflictError
+    ) -> JSONResponse:
+        body = ErrorResponse(
+            code="game_write_conflict",
+            message="The game changed on the server. Reload before retrying.",
+        )
         return JSONResponse(status_code=status.HTTP_409_CONFLICT, content=body.model_dump())
 
     @application.exception_handler(SimulationLimitError)

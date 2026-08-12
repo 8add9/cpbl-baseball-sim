@@ -1,6 +1,6 @@
 import { JSON_HEADERS, operationId, request } from './client'
 
-export type Archetype = 'contact' | 'power' | 'patient' | 'balanced'
+export type Archetype = 'contact' | 'power' | 'patient' | 'speed' | 'balanced'
 export type CareerSkillName = 'contact' | 'power' | 'eye' | 'speed_proxy'
 export interface CareerSkill { score: number; rating_raw: number; rating_display: number; potential_score: number; next_cost: number | null; can_train: boolean }
 export interface BattingStats { games: number; pa: number; ab: number; hits: number; singles: number; doubles: number; triples: number; home_runs: number; walks: number; hbp: number; strikeouts: number; total_bases: number; avg: number; obp: number; slg: number; ops: number }

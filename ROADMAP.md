@@ -94,7 +94,13 @@ Evidence:
 
 ## M5 — Career Mode 1-1
 
-**Status:** Complete (2026-08-12)
+**Status:** In Progress — v0.4 weekly-development replacement (2026-08-12)
+
+The former create-player + Next-PA loop is migration code and no longer satisfies
+acceptance. Completed v0.4 slice: five archetypes, weekly AP, skill XP/diminishing
+returns, fatigue/recovery, formal UI concept, and shared-engine approach adapter.
+Remaining: persisted v4 aggregate/migration, calendar/status/playing time, events,
+season/offseason/contract, balance harness and two-season browser QA.
 
 Acceptance:
 
@@ -166,7 +172,7 @@ Current evidence:
 
 ## M7 — Phase 1 completion
 
-**Status:** Complete (2026-08-12)
+**Status:** In Progress — Career v0.4 browser acceptance remains (2026-08-12)
 
 Acceptance:
 
@@ -181,19 +187,25 @@ Acceptance:
 
 Evidence:
 
-- Private release repository: `https://github.com/8add9/cpbl-baseball-sim`.
-- GitHub Actions run `31551414472` passed Python (181 tests plus Ruff/mypy), web
-  (6 tests, ESLint, build, audit), and production container build.
+- Public release repository: `https://github.com/8add9/cpbl-baseball-sim`.
+- GitHub Pages: `https://8add9.github.io/cpbl-baseball-sim/`; deployment run
+  `31554162283` passed. Architecture/CI run `31554028697` also passed.
+- The Linux API is exposed through the configured ngrok HTTPS endpoint while FastAPI
+  binds only to `127.0.0.1:8000`; SQL Server remains on `127.0.0.1:1433` and CORS allows
+  only the Pages origin.
 - The previous same-origin LAN container deployment is retained only as migration
   evidence. It does not satisfy the new GitHub Pages + ngrok completion gate.
 - Deployment smoke tests returned UI 200 and game creation 201; Manager loaded the
   hash-pinned 5,160-card catalog and created six teams/132 cards. After a real container
   restart, both Career and Manager saves reloaded at their original revisions.
-- Production browser QA loaded the persistent Manager dashboard with no console warnings
-  or errors. The SQL Server source container remained separate and unchanged.
+- Production Pages browser QA passed health, game creation, Next PA, reload recovery and
+  half-inning simulation with no console warnings or errors. The SQL Server source
+  container remained separate and unchanged.
 
-The status returns to Complete only after the new Pages URL and ngrok end-to-end path
-pass every deployment check above. Phase 2 remains blocked regardless of this migration.
+The Pages/ngrok path is operational. Ordinary Game, Career and Manager now have durable
+SQLite adapters; local restart-replay tests pass. Production restart evidence for the new
+Game adapter and Career v0.4 two-season browser acceptance remain required. Phase 2
+remains blocked regardless.
 
 ## Phase 2 — Operable batting prototype
 

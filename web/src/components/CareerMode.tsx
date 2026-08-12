@@ -8,12 +8,14 @@ const SKILLS: Array<[CareerSkillName, string]> = [
 ]
 const ARCHETYPES: Array<[Archetype, string, string]> = [
   ['contact', '巧打者', '優先發展接觸能力'], ['power', '強打者', '優先發展長打能力'],
-  ['patient', '選球型', '優先發展保送能力'], ['balanced', '均衡型', '四項能力平均起步'],
+  ['patient', '選球型', '優先發展保送能力'], ['speed', '速度型', '優先發展速度潛力'],
+  ['balanced', '均衡型', '四項能力平均起步'],
 ]
 const ARCHETYPE_PREVIEW: Record<Archetype, string> = {
   contact: 'Contact 66 · Power 55 · Eye 58 · SpeedProxy 60',
   power: 'Contact 57 · Power 68 · Eye 57 · SpeedProxy 57',
   patient: 'Contact 58 · Power 56 · Eye 67 · SpeedProxy 58',
+  speed: 'Contact 58 · Power 56 · Eye 57 · SpeedProxy 68',
   balanced: 'Contact 60 · Power 60 · Eye 60 · SpeedProxy 60',
 }
 

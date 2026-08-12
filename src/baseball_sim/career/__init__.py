@@ -32,6 +32,14 @@ from .simulation import (
     simulate_to_season_end,
     simulate_week,
 )
+from .weekly import (
+    PotentialTraits,
+    TrainingResult,
+    WeeklyAction,
+    WeeklyDevelopment,
+    apply_weekly_action,
+    archetype_potential_traits,
+)
 
 __all__ = [
     "AtomicJsonCareerRepository",
@@ -53,7 +61,13 @@ __all__ = [
     "RatingImprovedEvent",
     "SeasonAdvancedEvent",
     "SeasonRecord",
+    "PotentialTraits",
+    "TrainingResult",
+    "WeeklyAction",
+    "WeeklyDevelopment",
     "advance_season",
+    "apply_weekly_action",
+    "archetype_potential_traits",
     "create_career",
     "next_pa",
     "play_game",

@@ -21,6 +21,7 @@ class BatterArchetype(StrEnum):
     CONTACT = "contact"
     POWER = "power"
     PATIENT = "patient"
+    SPEED = "speed"
     BALANCED = "balanced"
 
 
@@ -106,6 +107,7 @@ ARCHETYPE_SCORES: dict[BatterArchetype, BatterSkillScores] = {
     BatterArchetype.CONTACT: BatterSkillScores(0.2, -1.2, -0.8, -0.6),
     BatterArchetype.POWER: BatterSkillScores(-0.9, 0.4, -1.0, -0.9),
     BatterArchetype.PATIENT: BatterSkillScores(-0.8, -1.1, 0.3, -0.8),
+    BatterArchetype.SPEED: BatterSkillScores(-0.8, -1.1, -0.9, 0.4),
     BatterArchetype.BALANCED: BatterSkillScores(-0.6, -0.6, -0.6, -0.6),
 }
 
@@ -117,6 +119,7 @@ def archetype_potential(archetype: BatterArchetype) -> BatterSkillScores:
         BatterArchetype.CONTACT: BatterSkill.CONTACT,
         BatterArchetype.POWER: BatterSkill.POWER,
         BatterArchetype.PATIENT: BatterSkill.EYE,
+        BatterArchetype.SPEED: BatterSkill.SPEED_PROXY,
     }[archetype]
     return BatterSkillScores(
         **{skill.value: 6.5 if skill is primary else 5.0 for skill in BatterSkill}

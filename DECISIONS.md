@@ -198,3 +198,29 @@
   The backend container/systemd service and ngrok lifecycle are operated on the Linux
   host; neither database secrets nor tunnel credentials enter the repository or Pages.
 - **Date:** 2026-08-12
+
+## ADR-019 — Weekly Career progression and shared PA approaches
+
+- **Decision:** Replace the Next-PA-first Career loop with a four-AP weekly calendar.
+  Training accumulates skill XP under age, Potential, fatigue, repetition and a soft
+  ceiling. Batting approaches transform Score inputs and delegate to the accepted PA
+  model.
+- **Why:** Career needs training/rest/approach choices without direct `Rating +1`,
+  runaway performance rewards, client-selected outcomes or a second simulator.
+- **Consequences:** Normal is bit-identical to ordinary gameplay. Speed remains a proxy
+  until runner research exists. v3 saves require migration, and Career MVP is In
+  Progress until weekly, season/offseason, balance and two-season browser gates pass.
+- **Date:** 2026-08-12
+
+## ADR-020 — Durable ordinary game sessions by outcome replay
+
+- **Decision:** Store ordinary text games in a separate SQLite database as initial/current
+  seed plus the ordered outcome stream. Reconstruct GameState with the accepted pure game
+  reducer on process startup.
+- **Why:** The public Pages client retains only a game ID, so an in-memory repository made
+  browser reload succeed but backend restart fail. Outcome replay is compact and preserves
+  one authoritative rules implementation.
+- **Consequences:** Corrupt rows are isolated from healthy saves. The adapter is suitable
+  for the single backend worker used in Phase 1; multi-worker coordination remains a
+  future deployment concern.
+- **Date:** 2026-08-12

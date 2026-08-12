@@ -18,6 +18,7 @@ def _primary_skill(archetype: BatterArchetype) -> BatterSkill | None:
         BatterArchetype.CONTACT: BatterSkill.CONTACT,
         BatterArchetype.POWER: BatterSkill.POWER,
         BatterArchetype.PATIENT: BatterSkill.EYE,
+        BatterArchetype.SPEED: BatterSkill.SPEED_PROXY,
         BatterArchetype.BALANCED: None,
     }[archetype]
 
@@ -30,7 +31,7 @@ def purchase_multiplier(archetype: BatterArchetype, skill: BatterSkill) -> float
 
 def purchase_cost(state: CareerState, skill: BatterSkill) -> int:
     if skill is BatterSkill.SPEED_PROXY:
-        raise ValueError("SpeedProxy is read-only in Career v0.3")
+        raise ValueError("SpeedProxy is not purchasable through legacy DP training")
     score = state.scores.get(skill)
     multiplier = purchase_multiplier(state.origin.profile.archetype, skill)
     return math.ceil(multiplier * (1.0 + max(score, 0.0) ** 2 / 3.0))
@@ -47,7 +48,10 @@ def spend_development_points(
     if state.active_game is not None:
         raise ValueError("training is unavailable during an active game")
     if skill is BatterSkill.SPEED_PROXY:
-        raise ValueError("SpeedProxy is read-only in Career v0.3")
+        raise ValueError(
+            "SpeedProxy is read-only in legacy DP training; "
+            "Career v0.4 develops it through weekly skill XP"
+        )
     skill_index = list(BatterSkill).index(skill)
     if state.season_purchases + purchases > SEASON_PURCHASE_CAP:
         raise ValueError("season purchase cap exceeded")
