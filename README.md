@@ -90,3 +90,7 @@ Open `http://localhost:8000`. The production image builds React, serves it from 
 FastAPI process, exposes the API on the same origin, and stores Career/Manager SQLite
 saves in the `baseball-sim-data` volume. Do not publish the repository or container until
 CPBL-derived names/data licensing has been reviewed.
+
+The current private LAN deployment is available at `http://192.168.1.160:8000`. Its
+Career and Manager saves live in a named Docker volume and have passed a real container
+restart/reload test. This address is intentionally not a public internet deployment.

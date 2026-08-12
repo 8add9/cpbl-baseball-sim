@@ -127,6 +127,11 @@ production multi-stage container build. The container smoke gate must serve `/`,
 `/api/games`, Career, and Manager endpoints from one origin while the SQLite volume
 survives a container restart.
 
+The 2026-08-12 deployment gate exercised that exact restart on the authorized Linux host:
+UI 200, game POST 201, Career save reload, Manager save reload, six teams/132 cards, and
+an empty production browser warning/error log. GitHub Actions run `31551414472` passed all
+Python, web, and container jobs.
+
 ## Milestone rule
 
 A green build is insufficient. Each milestone requires its acceptance tests, actual execution, QA evidence, bug fixes, and current documentation.

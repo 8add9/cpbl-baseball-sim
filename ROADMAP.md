@@ -166,10 +166,26 @@ Current evidence:
 
 ## M7 — Phase 1 completion
 
+**Status:** Complete (2026-08-12)
+
 Acceptance:
 
 - All prior gates pass together, persistent saves work, full browser playthrough passes, docs/screenshots/CI are current.
 - A new GitHub repository is created, committed, pushed, and deployed to a working browser URL.
+
+Evidence:
+
+- Private release repository: `https://github.com/8add9/cpbl-baseball-sim`.
+- GitHub Actions run `31551414472` passed Python (181 tests plus Ruff/mypy), web
+  (6 tests, ESLint, build, audit), and production container build.
+- Production is deployed on the authorized Linux host at
+  `http://192.168.1.160:8000` as container `cpbl-baseball-sim`, with Career and Manager
+  SQLite data on the named `cpbl-baseball-sim-data` volume.
+- Deployment smoke tests returned UI 200 and game creation 201; Manager loaded the
+  hash-pinned 5,160-card catalog and created six teams/132 cards. After a real container
+  restart, both Career and Manager saves reloaded at their original revisions.
+- Production browser QA loaded the persistent Manager dashboard with no console warnings
+  or errors. The SQL Server source container remained separate and unchanged.
 
 ## Phase 2 — Operable batting prototype
 
