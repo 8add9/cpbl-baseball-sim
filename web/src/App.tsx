@@ -10,7 +10,7 @@ import { useGame } from './useGame'
 
 export function App() {
   const [mode, setMode] = useState<'game' | 'career' | 'manager'>('game')
-  const { game, busy, error, act, reset } = useGame()
+  const { game, busy, error, act, reset, reconnect } = useGame()
 
   if (mode === 'career') {
     return <CareerMode onBack={() => setMode('game')} />
@@ -20,7 +20,13 @@ export function App() {
   }
 
   if (!game) {
-    return <main className="loading-state"><strong>{error ? '無法載入比賽' : '建立比賽中…'}</strong>{error ? <p>{error}</p> : null}</main>
+    return (
+      <main className="loading-state">
+        <strong>{error ? '遊戲伺服器目前無法連線。' : '正在連線遊戲伺服器…'}</strong>
+        {error ? <p>{error}</p> : null}
+        {error ? <button onClick={reconnect}>重新連線</button> : null}
+      </main>
+    )
   }
 
   return (

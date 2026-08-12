@@ -47,6 +47,26 @@ def _mutation(view: dict[str, object], operation_id: str) -> dict[str, object]:
     return {"expected_revision": view["revision"], "operation_id": operation_id}
 
 
+def test_player_catalog_endpoints_are_paginated_and_lookup_canonical_cards(
+    tmp_path: Path,
+) -> None:
+    client = _client(tmp_path / "managers.sqlite3")
+    listed = client.get("/api/players?limit=2")
+    assert listed.status_code == 200
+    payload = listed.json()
+    assert payload["total"] == 5160
+    assert len(payload["players"]) == 2
+    card = payload["players"][0]
+    assert set(card) == {
+        "player_id", "source_player_id", "name", "season_year", "team", "kind",
+        "profile_positions", "role", "incomplete_season", "abilities",
+    }
+    detail = client.get(f"/api/players/{card['player_id']}")
+    assert detail.status_code == 200
+    assert detail.json() == card
+    assert client.get("/api/players/missing-card").status_code == 404
+
+
 def test_manager_api_create_unique_league_idempotency_round_restart_and_compact_save(
     tmp_path: Path,
 ) -> None:

@@ -1,0 +1,17 @@
+[Unit]
+Description=CPBL Baseball Sim authoritative backend
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/home/chester/cpbl-baseball-sim
+EnvironmentFile=-/etc/cpbl-baseball-sim/backend.env
+ExecStart=/usr/bin/docker compose up --build -d
+ExecStop=/usr/bin/docker compose stop
+TimeoutStartSec=900
+
+[Install]
+WantedBy=multi-user.target

@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
-import { createGame, type GameView, mutateGame, resetGame } from './api'
+import { createGame, getGame, getHealth, type GameView, mutateGame, resetGame } from './api'
 
 const DEFAULT_SEED = 20260811
+const LAST_GAME_KEY = 'cpbl-baseball-sim:last-game-id:v1'
 
 export function useGame() {
   const [game, setGame] = useState<GameView | null>(null)
@@ -14,7 +15,9 @@ export function useGame() {
     setBusy(true)
     setError(null)
     try {
-      setGame(await operation())
+      const nextGame = await operation()
+      setGame(nextGame)
+      window.localStorage.setItem(LAST_GAME_KEY, nextGame.game_id)
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : '無法連線到比賽伺服器')
     } finally {
@@ -25,7 +28,26 @@ export function useGame() {
   useEffect(() => {
     if (initialized.current) return
     initialized.current = true
-    void run(() => createGame(DEFAULT_SEED))
+    void run(async () => {
+      await getHealth()
+      const savedGameId = window.localStorage.getItem(LAST_GAME_KEY)
+      if (savedGameId) {
+        try {
+          return await getGame(savedGameId)
+        } catch {
+          window.localStorage.removeItem(LAST_GAME_KEY)
+        }
+      }
+      return createGame(DEFAULT_SEED)
+    })
+  }, [run])
+
+  const reconnect = useCallback(() => {
+    void run(async () => {
+      await getHealth()
+      const savedGameId = window.localStorage.getItem(LAST_GAME_KEY)
+      return savedGameId ? getGame(savedGameId) : createGame(DEFAULT_SEED)
+    })
   }, [run])
 
   const act = useCallback(
@@ -39,5 +61,5 @@ export function useGame() {
     if (game) void run(() => resetGame(game.game_id, game.state.seed))
   }, [game, run])
 
-  return { game, busy, error, act, reset }
+  return { game, busy, error, act, reset, reconnect }
 }

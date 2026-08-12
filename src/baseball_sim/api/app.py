@@ -6,10 +6,10 @@ import os
 from pathlib import Path
 from typing import cast
 
-from fastapi import FastAPI, Request, status
+from fastapi import FastAPI, Query, Request, status
 from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from fastapi.staticfiles import StaticFiles
 
 from baseball_sim.career import (
     CareerState,
@@ -24,6 +24,7 @@ from baseball_sim.career import (
 from baseball_sim.career import (
     next_pa as play_next_career_pa,
 )
+from baseball_sim.manager.cards import CatalogEntry
 from baseball_sim.manager.league_service import (
     create_ai_league,
     replace_team_card,
@@ -31,6 +32,7 @@ from baseball_sim.manager.league_service import (
     simulate_league_season,
     simulate_next_league_game,
 )
+from baseball_sim.ratings.mapping import rating_display
 
 from .career_repository import (
     CareerCorruptError,
@@ -172,9 +174,28 @@ def create_app(
     sessions = repository or InMemoryGameRepository()
     careers = career_repository or SqliteCareerRepository(_default_career_database())
     application = FastAPI(title="CPBL Baseball Simulator API", version="0.1.0")
+    allowed_origins = [
+        origin.strip()
+        for origin in os.getenv(
+            "BASEBALL_SIM_CORS_ORIGINS",
+            "https://8add9.github.io,http://localhost:5173,http://127.0.0.1:5173",
+        ).split(",")
+        if origin.strip()
+    ]
+    application.add_middleware(
+        CORSMiddleware,
+        allow_origins=allowed_origins,
+        allow_credentials=False,
+        allow_methods=["GET", "POST", "OPTIONS"],
+        allow_headers=["Content-Type", "ngrok-skip-browser-warning"],
+    )
     application.state.game_repository = sessions
     application.state.career_repository = careers
     application.state.manager_repository = manager_repository
+
+    @application.get("/api/health")
+    def health() -> dict[str, str]:
+        return {"status": "ok", "version": application.version, "database": "ok"}
 
     @application.exception_handler(GameNotFoundError)
     async def game_not_found(_request: Request, _error: GameNotFoundError) -> JSONResponse:
@@ -309,6 +330,19 @@ def create_app(
     )
     def simulate_full(game_id: str) -> GameViewResponse:
         return _view(sessions.simulate_full(game_id))
+
+    application.add_api_route(
+        "/api/games/{game_id}/simulate-half-inning",
+        simulate_half,
+        methods=["POST"],
+        response_model=GameViewResponse,
+    )
+    application.add_api_route(
+        "/api/games/{game_id}/simulate-game",
+        simulate_full,
+        methods=["POST"],
+        response_model=GameViewResponse,
+    )
 
     @application.post(
         "/api/games/{game_id}/reset",
@@ -513,6 +547,52 @@ def create_app(
             application.state.manager_repository = backend
         return cast(SqliteManagerRepository, backend)
 
+    def player_card(entry: CatalogEntry) -> dict[str, object]:
+        card = entry.card
+        return {
+            "player_id": card.card_id,
+            "source_player_id": card.player_id,
+            "name": card.player_name,
+            "season_year": card.season_year,
+            "team": card.team,
+            "kind": card.kind.value,
+            "profile_positions": list(card.profile_positions),
+            "role": None if card.pitcher_role is None else card.pitcher_role.value,
+            "incomplete_season": card.incomplete_season,
+            "abilities": {
+                name: {
+                    "score": rating.score,
+                    "rating_raw": rating.rating_raw,
+                    "rating_display": rating_display(rating.rating_raw),
+                }
+                for name, rating in card.abilities.items()
+            },
+        }
+
+    @application.get("/api/players")
+    def list_players(
+        limit: int = Query(default=100, ge=1, le=500),
+        offset: int = Query(default=0, ge=0),
+    ) -> dict[str, object]:
+        entries = manager_backend().catalog.entries()
+        return {
+            "total": len(entries),
+            "players": [player_card(entry) for entry in entries[offset : offset + limit]],
+        }
+
+    @application.get("/api/players/{player_id:path}", response_model=None)
+    def get_player(player_id: str) -> dict[str, object] | JSONResponse:
+        try:
+            return player_card(manager_backend().catalog.get(player_id))
+        except KeyError:
+            return JSONResponse(
+                status_code=status.HTTP_404_NOT_FOUND,
+                content={
+                    "code": "player_not_found",
+                    "message": "Player card was not found.",
+                },
+            )
+
     @application.post(
         "/api/managers",
         response_model=ManagerViewResponse,
@@ -691,15 +771,6 @@ def create_app(
         manager_id: str, request: ManagerMutationRequest
     ) -> ManagerViewResponse:
         return mutate_manager(manager_id, request, "simulate-season")
-
-    static_root = Path(
-        os.getenv(
-            "BASEBALL_SIM_WEB_DIST",
-            str(Path(__file__).resolve().parents[3] / "web" / "dist"),
-        )
-    )
-    if static_root.is_dir():
-        application.mount("/", StaticFiles(directory=static_root, html=True), name="web")
 
     return application
 

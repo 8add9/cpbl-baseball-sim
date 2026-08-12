@@ -1,5 +1,43 @@
 # Architecture
 
+## Phase 1 production topology
+
+```text
+GitHub Pages (static React + TypeScript + Vite)
+        |
+        | HTTPS JSON API
+        v
+ngrok HTTPS endpoint
+        |
+        v
+Linux host loopback 127.0.0.1:8000
+        |
+        v
+FastAPI authoritative backend
+        |-- ratings and matchup simulation
+        |-- game state machine
+        |-- Career and Manager services
+        `-- SQLite persistence / read-only rating artifacts
+
+SQL Server 127.0.0.1:1433 (research/export source only)
+```
+
+The two deployables are intentionally separate. GitHub Pages owns rendering, UI state,
+and API calls only. It contains no probability model, rating computation, progression,
+ownership, SQL connection, or authoritative match state. FastAPI never depends on the
+frontend build and does not serve `web/dist` in production.
+
+The browser obtains the API origin only from `VITE_API_BASE_URL`. The production value is
+a GitHub repository variable injected by the Pages workflow; no ngrok URL is committed.
+All browser requests pass through the shared `web/src/api/client.ts` layer, which applies
+a ten-second timeout and converts transport failures into player-facing messages.
+
+FastAPI is reachable on the Linux host only through `127.0.0.1:8000`. ngrok is the sole
+Phase 1 public ingress. CORS permits the actual Pages origin and explicit localhost
+development origins, never `*`. SQL Server remains loopback-only and is never contacted
+by the browser. Replacing ngrok with a fixed HTTPS API origin later changes deployment
+configuration, not the game domain.
+
 ## System boundaries
 
 ```text
@@ -15,8 +53,8 @@ ratings adapter -> versioned game rating artifacts -> pure simulation domain
                                                              v
                                                   separate game persistence
                                                              |
-                                                             v
-                                                    React web client
+                                                    v
+                                            HTTPS API response
 ```
 
 ## Repository boundary
@@ -48,7 +86,11 @@ Start from completed-season CPBL league outcome probabilities. Decompose a PA hi
 
 `baseball_sim.api` is a thin FastAPI adapter over the pure game domain. It owns HTTP validation and an in-memory session repository, but never recalculates probabilities, advances runners, or queries raw SQL. Batch mutations commit only after reaching their target state.
 
-`web/` is a React/Vite client. It consumes explicit `GameView` responses and does not sample outcomes or calculate game rules. Network/session state lives in `useGame`; focused components render score, matchup, diamond, controls, play log, and lineups. The browser is never authoritative.
+`web/` is a separately deployed React/Vite client. It consumes explicit `GameView`
+responses and does not sample outcomes or calculate game rules. Network/session state
+lives in `useGame`; focused components render score, matchup, diamond, controls, play
+log, and lineups. localStorage may retain the last game ID and UI preferences, but never
+the authoritative game payload. The browser is never authoritative.
 
 ## M5 Career boundary
 

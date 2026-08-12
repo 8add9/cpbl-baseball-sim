@@ -18,6 +18,32 @@ def _create(client: TestClient, seed: int = 42) -> dict[str, object]:
     return response.json()
 
 
+def test_health_is_minimal_and_pages_cors_is_explicit(client: TestClient) -> None:
+    health = client.get("/api/health")
+    assert health.status_code == 200
+    assert health.json() == {"status": "ok", "version": "0.1.0", "database": "ok"}
+    assert set(health.json()) == {"status", "version", "database"}
+
+    preflight = client.options(
+        "/api/games",
+        headers={
+            "Origin": "https://8add9.github.io",
+            "Access-Control-Request-Method": "POST",
+        },
+    )
+    assert preflight.status_code == 200
+    assert preflight.headers["access-control-allow-origin"] == "https://8add9.github.io"
+
+    rejected = client.options(
+        "/api/games",
+        headers={
+            "Origin": "https://attacker.example",
+            "Access-Control-Request-Method": "POST",
+        },
+    )
+    assert "access-control-allow-origin" not in rejected.headers
+
+
 def test_create_returns_explicit_neutral_game_view(client: TestClient) -> None:
     view = _create(client)
     assert set(view) == {

@@ -1,0 +1,15 @@
+[Unit]
+Description=CPBL Baseball Sim ngrok HTTPS ingress
+After=cpbl-baseball-sim.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=chester
+ExecStartPre=/usr/bin/curl --fail --silent http://127.0.0.1:8000/api/health
+ExecStart=/home/chester/.local/bin/ngrok http http://127.0.0.1:8000 --log stdout
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

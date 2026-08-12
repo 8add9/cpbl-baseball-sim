@@ -77,7 +77,7 @@ Evidence:
 
 ## M4 — Text Game web MVP
 
-**Status:** Complete (2026-08-12)
+**Status:** In Progress — Web deployment architecture migration (2026-08-12)
 
 Acceptance:
 
@@ -172,20 +172,28 @@ Acceptance:
 
 - All prior gates pass together, persistent saves work, full browser playthrough passes, docs/screenshots/CI are current.
 - A new GitHub repository is created, committed, pushed, and deployed to a working browser URL.
+- GitHub Pages serves only the Vite static build and calls the authoritative Linux API
+  through ngrok HTTPS configured by `VITE_API_BASE_URL`.
+- FastAPI and SQL Server remain loopback-only; CORS permits the Pages origin rather than
+  a wildcard.
+- Health, game creation/action/reload, fast simulation, backend restart, ngrok URL update,
+  offline handling, and server-authoritative outcome boundaries pass production checks.
 
 Evidence:
 
 - Private release repository: `https://github.com/8add9/cpbl-baseball-sim`.
 - GitHub Actions run `31551414472` passed Python (181 tests plus Ruff/mypy), web
   (6 tests, ESLint, build, audit), and production container build.
-- Production is deployed on the authorized Linux host at
-  `http://192.168.1.160:8000` as container `cpbl-baseball-sim`, with Career and Manager
-  SQLite data on the named `cpbl-baseball-sim-data` volume.
+- The previous same-origin LAN container deployment is retained only as migration
+  evidence. It does not satisfy the new GitHub Pages + ngrok completion gate.
 - Deployment smoke tests returned UI 200 and game creation 201; Manager loaded the
   hash-pinned 5,160-card catalog and created six teams/132 cards. After a real container
   restart, both Career and Manager saves reloaded at their original revisions.
 - Production browser QA loaded the persistent Manager dashboard with no console warnings
   or errors. The SQL Server source container remained separate and unchanged.
+
+The status returns to Complete only after the new Pages URL and ngrok end-to-end path
+pass every deployment check above. Phase 2 remains blocked regardless of this migration.
 
 ## Phase 2 — Operable batting prototype
 

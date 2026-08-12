@@ -180,3 +180,21 @@
   Candidate discovery may present illegal star upgrades so the UI can explain rejection,
   but only a fully legal roster creates a new revision. Opening day freezes rosters.
 - **Date:** 2026-08-12
+
+## ADR-018 — Split GitHub Pages frontend and Linux authoritative backend
+
+- **Decision:** Deploy the React/Vite build as static GitHub Pages and expose the Linux
+  FastAPI backend only through an ngrok HTTPS endpoint. Bind the host port to
+  `127.0.0.1:8000`; inject the API origin through the `VITE_API_BASE_URL` repository
+  variable and an isolated API client layer.
+- **Why:** Static hosting must not move simulation or persistence into the browser, and
+  GitHub Pages cannot securely host Python, SQL access, secrets, or authoritative state.
+- **Alternatives:** Continue serving React from FastAPI on the LAN; move simulation into
+  TypeScript; expose port 8000 or SQL Server directly; introduce a VPS or Cloudflare
+  Tunnel during Phase 1.
+- **Consequences:** Frontend and backend are built and deployed independently. CORS is an
+  explicit origin allowlist. A changed free ngrok URL requires updating a GitHub variable
+  and rerunning Pages, not a source commit. Offline and timeout states are first-class UI.
+  The backend container/systemd service and ngrok lifecycle are operated on the Linux
+  host; neither database secrets nor tunnel credentials enter the repository or Pages.
+- **Date:** 2026-08-12

@@ -41,7 +41,10 @@ baseball-sim matchup \
 
 The CLI prints both analytic probabilities and sampled counts/slash line. Rating inputs are full-precision raw values in the open interval `(30, 110)`; integer display ratings are never simulation inputs.
 
-## Text Game development
+## Local Development
+
+Start the SQL/data dependency only when regenerating rating artifacts. Normal gameplay
+uses the committed hash-pinned snapshot and never queries SQL Server.
 
 Start the API:
 
@@ -77,20 +80,72 @@ Reproduce the Manager release balance gate with:
 python research/manager_balance_validation.py --games 20000 --workers 8
 ```
 
-## Production container
+## Production Frontend
 
-The private release repository includes the hash-pinned `rating-snapshot-v0.2` runtime
-artifact. Build and run the single-instance P1 service with:
+The production frontend is a static GitHub Pages build:
+
+`https://8add9.github.io/cpbl-baseball-sim/`
+
+The Pages workflow injects the repository variable `VITE_API_BASE_URL`. The value must
+be an HTTPS origin and is never committed in source or `.env.production`. Vite's
+production base is `/cpbl-baseball-sim/`; Phase 1 deliberately uses a single-page UI
+without path routing so refreshes do not require a Pages rewrite fallback.
+
+## Production Backend
+
+FastAPI runs on the Linux host as the only authoritative gameplay service. The container
+publishes port 8000 to host loopback only and persists Career/Manager data in the named
+volume:
 
 ```bash
-docker compose up --build -d
+./scripts/start-backend.sh
 ```
 
-Open `http://localhost:8000`. The production image builds React, serves it from the
-FastAPI process, exposes the API on the same origin, and stores Career/Manager SQLite
-saves in the `baseball-sim-data` volume. Do not publish the repository or container until
-CPBL-derived names/data licensing has been reviewed.
+The optional systemd unit template is
+`deploy/systemd/cpbl-baseball-sim.service`; the separate ngrok template is
+`deploy/systemd/cpbl-baseball-ngrok.service`. Install them as root, then use:
 
-The current private LAN deployment is available at `http://192.168.1.160:8000`. Its
-Career and Manager saves live in a named Docker volume and have passed a real container
-restart/reload test. This address is intentionally not a public internet deployment.
+```bash
+sudo systemctl enable --now cpbl-baseball-sim
+systemctl status cpbl-baseball-sim
+journalctl -u cpbl-baseball-sim
+```
+
+Secrets belong in `/etc/cpbl-baseball-sim/backend.env` or an untracked `.env.backend`,
+never in the unit or repository. The API health endpoint is
+`http://127.0.0.1:8000/api/health`.
+
+## ngrok Restart
+
+After configuring ngrok credentials on the Linux host, start the tunnel with:
+
+```bash
+./scripts/start-ngrok.sh
+```
+
+When a free tunnel receives a new URL, update the GitHub repository variable and trigger
+a Pages deployment without editing source:
+
+```bash
+./scripts/update-api-url.sh https://NEW_URL.ngrok-free.app
+```
+
+If the local ngrok inspection API is available, `scripts/publish-current-ngrok.sh`
+performs the URL lookup and delegates to the same validated update path.
+
+## Logs
+
+```bash
+journalctl -u cpbl-baseball-sim -f
+docker logs -f cpbl-baseball-sim
+```
+
+## Architecture
+
+GitHub Pages owns UI rendering only. Linux FastAPI owns ratings, simulation, game state,
+Career, Manager, validation, and persistence. The browser sends IDs and legal actions;
+it cannot submit ratings or choose a PA outcome. ngrok is replaceable HTTPS transport,
+not a game-logic dependency. SQL Server remains bound to `127.0.0.1:1433` and is never
+publicly exposed.
+
+Phase 2 / 全民打棒球-style work remains intentionally out of scope.
