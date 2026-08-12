@@ -122,6 +122,12 @@ def manager_view(record: ManagerRecord, catalog: CardCatalog) -> ManagerViewResp
             )
         )
     player_stats: list[ManagerPlayerStatView] = []
+    team_names = {team.config.team_id: team.config.name for team in state.teams}
+    owner_by_card = {
+        card_id: team.config.team_id
+        for team in state.teams
+        for card_id in team.config.roster.all_card_ids
+    }
     for item in state.player_stats:
         card = catalog.get(item.card_id).card
         if item.batter is not None:
@@ -161,10 +167,14 @@ def manager_view(record: ManagerRecord, catalog: CardCatalog) -> ManagerViewResp
                 "WHIP": pitcher_line.whip,
             }
             kind = "pitcher"
+        team_id = item.team_id or owner_by_card.get(item.card_id, "legacy-unknown")
         player_stats.append(
             ManagerPlayerStatView(
                 card_id=item.card_id,
                 player_name=card.player_name,
+                card_season_year=card.season_year,
+                team_id=team_id,
+                team_name=team_names.get(team_id) or "歷史資料（球隊未記錄）",
                 kind=kind,
                 values=values,
             )

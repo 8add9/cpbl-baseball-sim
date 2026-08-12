@@ -118,6 +118,7 @@ def _result_to_dict(result: GameResult) -> dict[str, object]:
 def _player_stat_to_dict(item: PlayerSeasonStat) -> dict[str, object]:
     return {
         "card_id": item.card_id,
+        "team_id": item.team_id,
         "season_year": item.season_year,
         "batter": None if item.batter is None else asdict(item.batter),
         "pitcher": None if item.pitcher is None else asdict(item.pitcher),
@@ -286,7 +287,12 @@ def manager_state_from_dict(value: object, catalog: CardCatalog) -> ManagerLeagu
             results=results,
             version=MANAGER_LEAGUE_VERSION,
         )
-    extra = _load_v2_fields(root)
+    owner_by_card = {
+        card_id: state.config.team_id
+        for state in states
+        for card_id in state.config.roster.all_card_ids
+    }
+    extra = _load_v2_fields(root, owner_by_card)
     return ManagerLeagueState(
         catalog=catalog,
         seed=seed,
@@ -315,7 +321,9 @@ def _load_result(value: object) -> GameResult:
     )
 
 
-def _load_player_stat(value: object) -> PlayerSeasonStat:
+def _load_player_stat(
+    value: object, owner_by_card: dict[str, str] | None = None
+) -> PlayerSeasonStat:
     data = _dict(value, "player stat")
     batter_raw = data.get("batter")
     pitcher_raw = data.get("pitcher")
@@ -328,11 +336,17 @@ def _load_player_stat(value: object) -> PlayerSeasonStat:
         pitcher=None
         if pitcher_raw is None
         else PitcherStatLine(**_dict(pitcher_raw, "pitcher stat")),
+        team_id=str(
+            data.get("team_id")
+            or (owner_by_card or {}).get(str(data["card_id"]), "")
+        ),
         version=str(data["version"]),
     )
 
 
-def _load_v2_fields(root: dict[str, Any]) -> _LoadedV2:
+def _load_v2_fields(
+    root: dict[str, Any], owner_by_card: dict[str, str]
+) -> _LoadedV2:
     franchise_raw = _dict(root["franchise"], "Manager franchise")
     franchise = ManagerFranchise(
         active_season_year=int(franchise_raw["active_season_year"]),
@@ -362,7 +376,10 @@ def _load_v2_fields(root: dict[str, Any]) -> _LoadedV2:
             ManagerSeasonArchive(
                 int(item["season_year"]),
                 tuple(_load_result(result) for result in item["results"]),
-                tuple(_load_player_stat(stat) for stat in item["player_stats"]),
+                tuple(
+                    _load_player_stat(stat, owner_by_card)
+                    for stat in item["player_stats"]
+                ),
             )
         )
     return _LoadedV2(
@@ -373,7 +390,9 @@ def _load_v2_fields(root: dict[str, Any]) -> _LoadedV2:
             for item in root["rotation_plans"]
         ),
         franchise=franchise,
-        player_stats=tuple(_load_player_stat(item) for item in root["player_stats"]),
+        player_stats=tuple(
+            _load_player_stat(item, owner_by_card) for item in root["player_stats"]
+        ),
         settled_game_ids=_strings(root["settled_game_ids"], "settled games"),
         season_history=tuple(history),
     )

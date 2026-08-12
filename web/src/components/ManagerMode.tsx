@@ -6,10 +6,11 @@ import {
 } from '../api'
 
 type ManagerAction = 'simulate-next-game' | 'simulate-round' | 'simulate-season' | 'advance-season'
-type ManagerTab = 'roster' | 'catalog' | 'standings' | 'stats'
+type ManagerTab = 'roster' | 'catalog' | 'standings' | 'team-stats' | 'league-stats'
 
 const TABS: Array<[ManagerTab, string]> = [
-  ['roster', '陣容'], ['catalog', '球員目錄'], ['standings', '戰績'], ['stats', '球員數據'],
+  ['roster', '陣容'], ['catalog', '球員目錄'], ['standings', '戰績'],
+  ['team-stats', '球隊球員數據'], ['league-stats', '聯盟球員數據'],
 ]
 
 function formatPct(value: number) {
@@ -78,12 +79,16 @@ function Standings({ manager }: { manager: ManagerView }) {
   </section>
 }
 
-function PlayerStats({ manager }: { manager: ManagerView }) {
+function PlayerStats({ manager, scope }: { manager: ManagerView; scope: 'team' | 'league' }) {
+  const stats = scope === 'team'
+    ? manager.player_stats.filter(item => item.team_id === manager.user_team_id)
+    : manager.player_stats
   return <section className="manager-panel manager-player-stats">
-    <div className="manager-section-title"><h2>{manager.season_year} 球員數據</h2><span>{manager.player_stats.length} 人</span></div>
+    <div className="manager-section-title"><h2>{manager.season_year} {scope === 'team' ? '球隊球員數據' : '聯盟球員數據'}</h2><span>{stats.length} 筆</span></div>
     <div className="manager-stats-scroll">
-      {manager.player_stats.length === 0 ? <p>尚無本季出賽數據</p> : manager.player_stats.map(item => <div key={item.card_id}>
-        <strong>{item.player_name}</strong><small>{item.kind === 'batter' ? '打者' : '投手'}</small>
+      {stats.length === 0 ? <p>尚無本季出賽數據</p> : stats.map(item => <div key={`${item.team_id}:${item.card_id}`}>
+        <strong>{item.player_name} <small>{item.card_season_year}</small></strong>
+        <small>{scope === 'league' ? `${item.team_name} · ` : ''}{item.kind === 'batter' ? '打者' : '投手'}</small>
         <span>{Object.entries(item.values).map(([key, value]) => `${key} ${typeof value === 'number' && !Number.isInteger(value) ? value.toFixed(3) : value}`).join(' · ')}</span>
       </div>)}
     </div>
@@ -277,7 +282,9 @@ export function ManagerMode({ onBack }: { onBack: () => void }) {
           <CompactRoster title="牛棚投手" cards={team.bullpen} available={available} />
         </div> : null}
       </section>
-      <aside className="manager-league-column">{tab === 'stats' ? <PlayerStats manager={manager} /> : <Standings manager={manager} />}
+      <aside className="manager-league-column">{tab === 'team-stats' || tab === 'league-stats'
+        ? <PlayerStats manager={manager} scope={tab === 'team-stats' ? 'team' : 'league'} />
+        : <Standings manager={manager} />}
         <section className="manager-panel manager-recent"><div className="manager-section-title"><h2>最近戰績</h2><span>近 10 場</span></div>
           {manager.recent_results.length ? manager.recent_results.slice().reverse().map(result => <div key={result.game_number}>
             <span>G{result.game_number}</span><strong>{teamNames[result.away_team_id] ?? result.away_team_id} {result.away_runs}–{result.home_runs} {teamNames[result.home_team_id] ?? result.home_team_id}</strong></div>) : <p>尚未進行比賽</p>}</section>

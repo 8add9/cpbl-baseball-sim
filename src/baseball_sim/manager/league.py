@@ -285,7 +285,12 @@ def simulate_next_league_game(state: ManagerLeagueState) -> ManagerLeagueState:
     if settled_id in state.settled_game_ids:
         raise ValueError("Manager game was already settled")
     player_stats = state.player_stats
-    for delta in game_stat_deltas(game, state.season_year):
+    for delta in game_stat_deltas(
+        game,
+        state.season_year,
+        scheduled.away_team_id,
+        scheduled.home_team_id,
+    ):
         player_stats = merge_player_season_stats(player_stats, delta)
     return replace(
         state,

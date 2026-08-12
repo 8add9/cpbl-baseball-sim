@@ -40,7 +40,10 @@ const manager = {
   })),
   teams: [team, ...['統一7-ELEVEn獅', '樂天桃猿', '味全龍', '富邦悍將', '台鋼雄鷹'].map((name, index) => ({ ...team, team_id: `team-${index + 2}`, name }))],
   recent_results: [],
-  player_stats: [],
+  player_stats: [
+    { card_id: 'b-1', player_name: '我隊打者', card_season_year: 2025, team_id: 'team-1', team_name: '中信兄弟', kind: 'batter', values: { PA: 4, H: 2 } },
+    { card_id: 'b-2', player_name: '他隊打者', card_season_year: 2024, team_id: 'team-2', team_name: '統一7-ELEVEn獅', kind: 'batter', values: { PA: 4, H: 1 } },
+  ],
 }
 
 beforeEach(() => {
@@ -102,6 +105,21 @@ test('mobile tabs expose standings and mutation sends current revision', async (
     `/api/managers/${manager.manager_id}/simulate-next-game`,
     expect.objectContaining({ method: 'POST' }),
   )
+})
+
+test('splits user-team stats from league stats and labels every league team', async () => {
+  render(<ManagerMode onBack={() => undefined} />)
+  await screen.findByRole('heading', { name: '先發打線' })
+  fireEvent.click(screen.getByRole('button', { name: '球隊球員數據' }))
+  expect(screen.getByRole('heading', { name: '2026 球隊球員數據' })).toBeInTheDocument()
+  expect(screen.getByText('我隊打者')).toBeInTheDocument()
+  expect(screen.queryByText('他隊打者')).not.toBeInTheDocument()
+
+  fireEvent.click(screen.getByRole('button', { name: '聯盟球員數據' }))
+  expect(screen.getByRole('heading', { name: '2026 聯盟球員數據' })).toBeInTheDocument()
+  expect(screen.getByText('我隊打者')).toBeInTheDocument()
+  expect(screen.getByText('他隊打者')).toBeInTheDocument()
+  expect(screen.getByText('統一7-ELEVEn獅 · 打者')).toBeInTheDocument()
 })
 
 test('preseason roster builder surfaces server-side star limit rejection', async () => {

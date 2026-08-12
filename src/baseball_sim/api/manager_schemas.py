@@ -138,6 +138,9 @@ class ManagerPlayerStatView(BaseModel):
 
     card_id: str
     player_name: str
+    card_season_year: int
+    team_id: str
+    team_name: str
     kind: str
     values: dict[str, int | float | str]
 

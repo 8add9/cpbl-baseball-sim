@@ -32,13 +32,29 @@ def test_pitcher_outs_are_authoritative_and_ledger_order_is_deterministic() -> N
     assert line.innings_pitched == "6.2"
     assert line.runs_allowed_per_nine == 2.7
     assert line.whip == 1.05
-    pitcher = PlayerSeasonStat("z", 2026, pitcher=line)
-    batter = PlayerSeasonStat("a", 2026, batter=BatterStatLine(games=1))
+    pitcher = PlayerSeasonStat("z", 2026, pitcher=line, team_id="team-2")
+    batter = PlayerSeasonStat(
+        "a", 2026, batter=BatterStatLine(games=1), team_id="team-1"
+    )
     ledger = merge_player_season_stats((), pitcher)
     ledger = merge_player_season_stats(ledger, batter)
     ledger = merge_player_season_stats(ledger, pitcher)
     assert tuple(item.card_id for item in ledger) == ("a", "z")
     assert ledger[1].pitcher is not None and ledger[1].pitcher.games == 2
+
+
+def test_same_card_on_two_teams_keeps_separate_stat_lines() -> None:
+    first = PlayerSeasonStat(
+        "card", 2026, batter=BatterStatLine(games=1, pa=1, ab=1), team_id="team-1"
+    )
+    second = PlayerSeasonStat(
+        "card", 2026, batter=BatterStatLine(games=1, pa=1, ab=1), team_id="team-2"
+    )
+    ledger = merge_player_season_stats(merge_player_season_stats((), first), second)
+    assert [(item.team_id, item.card_id) for item in ledger] == [
+        ("team-1", "card"),
+        ("team-2", "card"),
+    ]
 
 
 def test_stats_reject_impossible_lines_and_cross_season_merges() -> None:

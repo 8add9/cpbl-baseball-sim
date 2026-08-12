@@ -110,6 +110,7 @@ class PlayerSeasonStat:
     season_year: int
     batter: BatterStatLine | None = None
     pitcher: PitcherStatLine | None = None
+    team_id: str = ""
     version: str = PLAYER_SEASON_STATS_VERSION
 
     def __post_init__(self) -> None:
@@ -125,30 +126,40 @@ def merge_player_season_stats(
     current: tuple[PlayerSeasonStat, ...], update: PlayerSeasonStat
 ) -> tuple[PlayerSeasonStat, ...]:
     """Add a game line and keep the ledger in deterministic CardID order."""
-    by_id = {item.card_id: item for item in current}
+    by_id = {(item.team_id, item.card_id): item for item in current}
     if len(by_id) != len(current):
-        raise ValueError("player-season ledger contains duplicate CardIDs")
-    existing = by_id.get(update.card_id)
+        raise ValueError("player-season ledger contains duplicate team/CardIDs")
+    key = (update.team_id, update.card_id)
+    existing = by_id.get(key)
     if existing is None:
-        by_id[update.card_id] = update
+        by_id[key] = update
     else:
         if existing.season_year != update.season_year:
             raise ValueError("cannot merge player statistics across seasons")
         if existing.batter is not None and update.batter is not None:
-            by_id[update.card_id] = PlayerSeasonStat(
-                update.card_id, update.season_year, batter=existing.batter + update.batter
+            by_id[key] = PlayerSeasonStat(
+                update.card_id,
+                update.season_year,
+                batter=existing.batter + update.batter,
+                team_id=update.team_id,
             )
         elif existing.pitcher is not None and update.pitcher is not None:
-            by_id[update.card_id] = PlayerSeasonStat(
-                update.card_id, update.season_year, pitcher=existing.pitcher + update.pitcher
+            by_id[key] = PlayerSeasonStat(
+                update.card_id,
+                update.season_year,
+                pitcher=existing.pitcher + update.pitcher,
+                team_id=update.team_id,
             )
         else:
             raise ValueError("cannot change a player-season stat kind")
-    return tuple(by_id[card_id] for card_id in sorted(by_id))
+    return tuple(by_id[key] for key in sorted(by_id))
 
 
 def game_stat_deltas(
-    result: ManagerGameResult, season_year: int
+    result: ManagerGameResult,
+    season_year: int,
+    away_team_id: str,
+    home_team_id: str,
 ) -> tuple[PlayerSeasonStat, ...]:
     """Project only statistics supported by the authoritative PA transition stream."""
     batter_lines: dict[str, BatterStatLine] = {}
@@ -156,6 +167,26 @@ def game_stat_deltas(
     starters = {
         result.away_roster.used_pitcher_card_ids[0],
         result.home_roster.used_pitcher_card_ids[0],
+    }
+    card_teams = {
+        **{
+            card_id: away_team_id
+            for card_id in (
+                tuple(entry.card_id for entry in result.away_roster.lineup)
+                + result.away_roster.bench_card_ids
+                + result.away_roster.rotation_card_ids
+                + result.away_roster.bullpen_card_ids
+            )
+        },
+        **{
+            card_id: home_team_id
+            for card_id in (
+                tuple(entry.card_id for entry in result.home_roster.lineup)
+                + result.home_roster.bench_card_ids
+                + result.home_roster.rotation_card_ids
+                + result.home_roster.bullpen_card_ids
+            )
+        },
     }
     for transition in result.transitions:
         outcome = transition.outcome
@@ -195,6 +226,7 @@ def game_stat_deltas(
                 card_id,
                 season_year,
                 batter=replace(batter_line, games=1),
+                team_id=card_teams[card_id],
             )
         )
     for card_id, pitcher_line in pitcher_lines.items():
@@ -207,6 +239,7 @@ def game_stat_deltas(
                     games=1,
                     games_started=int(card_id in starters),
                 ),
+                team_id=card_teams[card_id],
             )
         )
-    return tuple(sorted(deltas, key=lambda item: item.card_id))
+    return tuple(sorted(deltas, key=lambda item: (item.team_id, item.card_id)))

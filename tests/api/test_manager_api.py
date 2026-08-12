@@ -108,6 +108,13 @@ def test_manager_api_create_unique_league_idempotency_round_restart_and_compact_
     assert view["revision"] == 2
     assert view["games_completed"] == 1
     assert len(view["recent_results"]) == 1
+    assert view["player_stats"]
+    assert {item["team_id"] for item in view["player_stats"]} == {
+        created["next_game"]["away_team_id"],
+        created["next_game"]["home_team_id"],
+    }
+    assert all(item["team_name"] for item in view["player_stats"])
+    assert all(item["card_season_year"] <= 2025 for item in view["player_stats"])
     duplicate = client.post(
         f"/api/managers/{manager_id}/simulate-next-game", json=request
     )
