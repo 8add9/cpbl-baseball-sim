@@ -10,7 +10,7 @@ from .franchise import ManagerFranchise, advance_to_next_season, create_franchis
 from .game_roster import LineupEntry, TeamGameRoster, create_team_game_roster
 from .game_simulation import create_manager_game, simulate_manager_game
 from .player_stats import PlayerSeasonStat, game_stat_deltas, merge_player_season_stats
-from .roster import RosterSelection, evaluate_roster
+from .roster import RosterRules, RosterSelection, evaluate_roster
 from .season import GameResult, ScheduledGame, Standings, generate_schedule
 from .usage import (
     PitcherAvailability,
@@ -209,6 +209,15 @@ def _game_roster(
         state.config.lineup,
         starter,
         unavailable,
+        RosterRules(
+            roster_size=len(state.config.roster.all_card_ids),
+            batter_count=len(state.config.roster.batter_card_ids),
+            rotation_count=len(state.config.roster.rotation_card_ids),
+            bullpen_count=len(state.config.roster.bullpen_card_ids),
+            budget=None,
+            max_ssr=None,
+            max_sr=len(state.config.roster.all_card_ids),
+        ),
     )
     return roster, starter
 

@@ -436,6 +436,7 @@ def test_team_8add9_unlocks_caps_and_rotation_allows_same_starter(
     assert renamed_team["unlimited_roster"] is True
     assert renamed_team["cost_limit"] is None
     assert renamed_team["ssr_limit"] is None
+    assert renamed_team["sr_limit"] is None
 
     starter = user_team["rotation"][0]["card_id"]
     rotation_response = client.post(
@@ -455,5 +456,42 @@ def test_team_8add9_unlocks_caps_and_rotation_allows_same_starter(
     assert rotated_team["rotation_plan"] == [starter] * 4
     assert rotated_team["next_starter_card_id"] == starter
 
+    expanded = rotated
+    swap_index = 0
+    while True:
+        expanded_team = next(
+            team for team in expanded["teams"] if team["team_id"] == expanded["user_team_id"]
+        )
+        if expanded_team["roster_cost"] > 70 and expanded_team["tier_counts"]["SSR"] > 2:
+            break
+        outgoing = next(card for card in expanded_team["lineup"] if card["tier"] != "SSR")
+        candidates = client.get(
+            f"/api/managers/{manager_id}/roster-candidates",
+            params={
+                "team_id": expanded_team["team_id"],
+                "outgoing_card_id": outgoing["card_id"],
+            },
+        ).json()["candidates"]
+        incoming = next(card for card in candidates if card["tier"] == "SSR")
+        swap_index += 1
+        response = client.post(
+            f"/api/managers/{manager_id}/replace-card",
+            json={
+                **_mutation(expanded, f"unlimited-star-{swap_index}"),
+                "team_id": expanded_team["team_id"],
+                "outgoing_card_id": outgoing["card_id"],
+                "incoming_card_id": incoming["card_id"],
+            },
+        )
+        assert response.status_code == 200, response.text
+        expanded = response.json()
+
+    played = client.post(
+        f"/api/managers/{manager_id}/simulate-next-game",
+        json=_mutation(expanded, "unlimited-play"),
+    )
+    assert played.status_code == 200, played.text
+    assert played.json()["games_completed"] == 1
+
     restarted = _client(database)
-    assert restarted.get(f"/api/managers/{manager_id}").json() == rotated
+    assert restarted.get(f"/api/managers/{manager_id}").json() == played.json()

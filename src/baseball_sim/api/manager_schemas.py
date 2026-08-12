@@ -129,6 +129,7 @@ class ManagerTeamView(BaseModel):
     rotation_plan: list[str]
     cost_limit: int | None
     ssr_limit: int | None
+    sr_limit: int | None
     unlimited_roster: bool
 
 

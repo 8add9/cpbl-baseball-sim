@@ -234,7 +234,7 @@ export function ManagerMode({ onBack }: { onBack: () => void }) {
     {team?.team_id === manager.user_team_id ? <section className="manager-customize-bar">
       <label>球隊名稱<input value={teamName} maxLength={40} onChange={event => setTeamName(event.target.value)} /></label>
       <button disabled={busy || teamName.trim() === team.name} onClick={saveTeamName}>儲存名稱</button>
-      {team.unlimited_roster ? <strong>8add9 特權：Cost 與 SSR 無上限</strong> : null}
+      {team.unlimited_roster ? <strong>8add9 特權：Cost、SSR 與 SR 無上限</strong> : null}
     </section> : null}
     <nav className="manager-tabs" aria-label="經理模式檢視">{TABS.map(([value, label]) =>
       <button className={tab === value ? 'active' : ''} onClick={() => setTab(value)} key={value}>{label}</button>)}</nav>
@@ -252,7 +252,9 @@ export function ManagerMode({ onBack }: { onBack: () => void }) {
         </div> : null}
         {swapTarget ? <div className="manager-swap-builder">
           <div className="manager-section-title"><h3>替換 {swapTarget.player_name}</h3><button onClick={() => { setSwapTarget(null); setSwapCandidates([]) }}>關閉</button></div>
-          <p>換入後會由伺服器重新檢查 70 點預算、SSR 2 張、SR 5 張、守位與投手角色。</p>
+          <p>{team?.unlimited_roster
+            ? '8add9 不限制 Cost、SSR 與 SR；仍會檢查守位及投手角色。'
+            : '換入後會由伺服器重新檢查 70 點預算、SSR 2 張、SR 5 張、守位與投手角色。'}</p>
           <div>{swapCandidates.map(candidate => <button disabled={busy} onClick={() => swapCard(candidate)} key={candidate.card_id}>
             <span>{candidate.role ?? candidate.profile_position}</span><strong>{candidate.player_name}</strong>
             <small>{candidate.season_year}</small><em data-tier={candidate.tier}>{candidate.tier}</em><b>{candidate.cost}</b>
@@ -262,7 +264,7 @@ export function ManagerMode({ onBack }: { onBack: () => void }) {
       <section className="manager-roster-column">
         <div className="manager-budget"><div><span>我的球隊</span><strong>{team?.name}</strong></div>
           <div><span>SSR</span><strong>{team?.tier_counts.SSR ?? 0} / {team?.ssr_limit ?? '∞'}</strong></div>
-          <div><span>SR</span><strong>{team?.tier_counts.SR ?? 0} / 5</strong></div></div>
+          <div><span>SR</span><strong>{team?.tier_counts.SR ?? 0} / {team?.sr_limit ?? '∞'}</strong></div></div>
         {team ? <RosterTable team={team} onSelect={setSelectedCard} onMove={moveLineup} disabled={busy} /> : null}
         {team ? <div className="manager-groups">
           <CompactRoster title="替補球員" cards={team.bench} />

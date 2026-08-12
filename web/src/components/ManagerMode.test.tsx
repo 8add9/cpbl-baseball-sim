@@ -25,7 +25,7 @@ const team = {
   tier_counts: { N: 21, R: 0, SR: 1, SSR: 0 },
   available_bullpen_card_ids: ['p-5', 'p-6', 'p-7', 'p-8', 'p-9'],
   rotation_plan: ['p-1', 'p-2', 'p-3', 'p-4'],
-  cost_limit: 70, ssr_limit: 2, unlimited_roster: false,
+  cost_limit: 70, ssr_limit: 2, sr_limit: 5, unlimited_roster: false,
 }
 const manager = {
   manager_id: '11111111-1111-4111-8111-111111111111', revision: 1,
@@ -75,6 +75,20 @@ test('keeps roster editing enabled after the season starts', async () => {
   render(<ManagerMode onBack={() => undefined} />)
   expect(await screen.findByRole('button', { name: '替換此卡' })).toBeEnabled()
   expect(screen.getAllByRole('combobox').some(control => !control.hasAttribute('disabled'))).toBe(true)
+})
+
+test('shows every 8add9 tier allowance as unlimited', async () => {
+  const unlimitedTeam = {
+    ...team, name: '8add9', roster_cost: 99, tier_counts: { N: 10, R: 2, SR: 6, SSR: 4 },
+    cost_limit: null, ssr_limit: null, sr_limit: null, unlimited_roster: true,
+  }
+  const unlimited = { ...manager, teams: [unlimitedTeam, ...manager.teams.slice(1)] }
+  vi.mocked(fetch).mockResolvedValueOnce({
+    ok: true, json: () => Promise.resolve({ managers: [unlimited] }),
+  } as Response)
+  render(<ManagerMode onBack={() => undefined} />)
+  expect(await screen.findByText('8add9 特權：Cost、SSR 與 SR 無上限')).toBeInTheDocument()
+  expect(screen.getByText('6 / ∞')).toBeInTheDocument()
 })
 
 test('mobile tabs expose standings and mutation sends current revision', async () => {

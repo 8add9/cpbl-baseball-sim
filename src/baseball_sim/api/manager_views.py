@@ -117,6 +117,7 @@ def manager_view(record: ManagerRecord, catalog: CardCatalog) -> ManagerViewResp
                 rotation_plan=list(rotation_plan),
                 cost_limit=limits.cost_limit,
                 ssr_limit=limits.ssr_limit,
+                sr_limit=None if limits.unlimited else 5,
                 unlimited_roster=limits.unlimited,
             )
         )

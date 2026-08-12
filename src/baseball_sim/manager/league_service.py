@@ -106,7 +106,7 @@ def _rules_for_team(state: ManagerLeagueState, team_id: str) -> RosterRules:
         bullpen_count=5,
         budget=limits.cost_limit,
         max_ssr=limits.ssr_limit,
-        max_sr=5,
+        max_sr=(len(selection.all_card_ids) if limits.unlimited else 5),
     )
 
 
