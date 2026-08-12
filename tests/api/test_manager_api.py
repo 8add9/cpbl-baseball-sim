@@ -115,6 +115,11 @@ def test_manager_api_create_unique_league_idempotency_round_restart_and_compact_
     }
     assert all(item["team_name"] for item in view["player_stats"])
     assert all(item["card_season_year"] <= 2025 for item in view["player_stats"])
+    pitcher_values = [
+        item["values"] for item in view["player_stats"] if item["kind"] == "pitcher"
+    ]
+    assert sum(item["W"] for item in pitcher_values) == 1
+    assert sum(item["L"] for item in pitcher_values) == 1
     duplicate = client.post(
         f"/api/managers/{manager_id}/simulate-next-game", json=request
     )

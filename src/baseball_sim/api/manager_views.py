@@ -155,6 +155,8 @@ def manager_view(record: ManagerRecord, catalog: CardCatalog) -> ManagerViewResp
             values = {
                 "G": pitcher_line.games,
                 "GS": pitcher_line.games_started,
+                "W": pitcher_line.wins,
+                "L": pitcher_line.losses,
                 "IP": pitcher_line.innings_pitched,
                 "BF": pitcher_line.batters_faced,
                 "H": pitcher_line.hits,

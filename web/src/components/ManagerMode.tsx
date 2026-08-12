@@ -88,8 +88,12 @@ function PlayerStats({ manager, scope }: { manager: ManagerView; scope: 'team' |
     <div className="manager-stats-scroll">
       {stats.length === 0 ? <p>尚無本季出賽數據</p> : stats.map(item => <div key={`${item.team_id}:${item.card_id}`}>
         <strong>{item.player_name} <small>{item.card_season_year}</small></strong>
-        <small>{scope === 'league' ? `${item.team_name} · ` : ''}{item.kind === 'batter' ? '打者' : '投手'}</small>
-        <span>{Object.entries(item.values).map(([key, value]) => `${key} ${typeof value === 'number' && !Number.isInteger(value) ? value.toFixed(3) : value}`).join(' · ')}</span>
+        <small>{scope === 'league' ? `${item.team_name} · ` : ''}{item.kind === 'batter'
+          ? '打者'
+          : `投手 · ${item.values.W ?? 0}勝 ${item.values.L ?? 0}敗`}</small>
+        <span>{Object.entries(item.values)
+          .filter(([key]) => item.kind !== 'pitcher' || !['W', 'L'].includes(key))
+          .map(([key, value]) => `${key} ${typeof value === 'number' && !Number.isInteger(value) ? value.toFixed(3) : value}`).join(' · ')}</span>
       </div>)}
     </div>
   </section>
@@ -263,6 +267,11 @@ export function ManagerMode({ onBack }: { onBack: () => void }) {
           <div>{swapCandidates.map(candidate => <button disabled={busy} onClick={() => swapCard(candidate)} key={candidate.card_id}>
             <span>{candidate.role ?? candidate.profile_position}</span><strong>{candidate.player_name}</strong>
             <small>{candidate.season_year}</small><em data-tier={candidate.tier}>{candidate.tier}</em><b>{candidate.cost}</b>
+            <span className="manager-swap-abilities">
+              {Object.entries(candidate.abilities).map(([ability, value]) => <small key={ability}>
+                {ability} <strong>{Math.round(value)}</strong>
+              </small>)}
+            </span>
           </button>)}</div>
         </div> : null}
       </aside>

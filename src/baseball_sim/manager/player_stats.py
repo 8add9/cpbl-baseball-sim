@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 
+from baseball_sim.game.state import Team
 from baseball_sim.simulation.outcomes import Outcome
 
 from .game_simulation import ManagerGameResult
@@ -75,6 +76,8 @@ class PitcherStatLine:
     hbp: int = 0
     strikeouts: int = 0
     runs: int = 0
+    wins: int = 0
+    losses: int = 0
 
     def __post_init__(self) -> None:
         values = tuple(getattr(self, name) for name in self.__dataclass_fields__)
@@ -82,6 +85,8 @@ class PitcherStatLine:
             raise ValueError("pitcher statistics cannot be negative")
         if self.games_started > self.games or self.strikeouts > self.outs_recorded:
             raise ValueError("pitcher game or strikeout totals are inconsistent")
+        if self.wins + self.losses > self.games:
+            raise ValueError("pitcher decisions cannot exceed games pitched")
 
     @property
     def innings_pitched(self) -> str:
@@ -188,6 +193,9 @@ def game_stat_deltas(
             )
         },
     }
+    winning_pitcher, losing_pitcher = _pitcher_decisions(
+        result, card_teams, away_team_id, home_team_id
+    )
     for transition in result.transitions:
         outcome = transition.outcome
         hit = outcome in {Outcome.SINGLE, Outcome.DOUBLE, Outcome.TRIPLE, Outcome.HR}
@@ -238,8 +246,59 @@ def game_stat_deltas(
                     pitcher_line,
                     games=1,
                     games_started=int(card_id in starters),
+                    wins=int(card_id == winning_pitcher),
+                    losses=int(card_id == losing_pitcher),
                 ),
                 team_id=card_teams[card_id],
             )
         )
     return tuple(sorted(deltas, key=lambda item: (item.team_id, item.card_id)))
+
+
+def _pitcher_decisions(
+    result: ManagerGameResult,
+    card_teams: dict[str, str],
+    away_team_id: str,
+    home_team_id: str,
+) -> tuple[str, str]:
+    """Assign one simplified pitcher win/loss from the permanent go-ahead play."""
+    winner = result.final_state.winner
+    if winner is None:
+        raise ValueError("finished Manager game requires a winner")
+    winner_team_id = away_team_id if winner is Team.AWAY else home_team_id
+    loser_team_id = home_team_id if winner is Team.AWAY else away_team_id
+
+    decisive_index = -1
+    for index, transition in enumerate(result.transitions):
+        state = transition.state
+        winner_score = state.away_score if winner is Team.AWAY else state.home_score
+        loser_score = state.home_score if winner is Team.AWAY else state.away_score
+        if transition.runs_scored <= 0 or winner_score <= loser_score:
+            continue
+        if all(
+            (
+                later.state.away_score > later.state.home_score
+                if winner is Team.AWAY
+                else later.state.home_score > later.state.away_score
+            )
+            for later in result.transitions[index:]
+        ):
+            decisive_index = index
+            break
+    if decisive_index < 0:
+        raise ValueError("Manager game has no permanent go-ahead play")
+
+    losing_pitcher = result.transitions[decisive_index].pitcher
+    if card_teams.get(losing_pitcher) != loser_team_id:
+        raise ValueError("losing pitcher does not belong to the losing team")
+    winning_pitcher = next(
+        (
+            transition.pitcher
+            for transition in reversed(result.transitions[:decisive_index])
+            if card_teams.get(transition.pitcher) == winner_team_id
+        ),
+        result.away_roster.used_pitcher_card_ids[0]
+        if winner is Team.AWAY
+        else result.home_roster.used_pitcher_card_ids[0],
+    )
+    return winning_pitcher, losing_pitcher

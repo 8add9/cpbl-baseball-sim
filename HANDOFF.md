@@ -30,7 +30,8 @@
 目前統計口徑：
 
 - 打者：G、PA、AB、H、2B、3B、HR、BB、HBP、SO、AVG、OBP、SLG、OPS。
-- 投手：G、GS、IP、BF、H、HR、BB、HBP、SO、R、RA9、WHIP。
+- 投手：G、GS、W、L、IP、BF、H、HR、BB、HBP、SO、R、RA9、WHIP。
+- 投手勝敗以「最終勝隊取得永久領先時的投手責任」作 deterministic 簡化判定，並非完整官方勝投資格規則。
 - 投手的 R／RA9 目前是簡化口徑；engine 尚未保存 inherited runner 的 responsible pitcher。
 
 ## 3. 重要版本與資料

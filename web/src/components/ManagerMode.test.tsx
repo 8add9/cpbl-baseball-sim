@@ -43,6 +43,7 @@ const manager = {
   player_stats: [
     { card_id: 'b-1', player_name: '我隊打者', card_season_year: 2025, team_id: 'team-1', team_name: '中信兄弟', kind: 'batter', values: { PA: 4, H: 2 } },
     { card_id: 'b-2', player_name: '他隊打者', card_season_year: 2024, team_id: 'team-2', team_name: '統一7-ELEVEn獅', kind: 'batter', values: { PA: 4, H: 1 } },
+    { card_id: 'p-1', player_name: '我隊投手', card_season_year: 2024, team_id: 'team-1', team_name: '中信兄弟', kind: 'pitcher', values: { G: 2, W: 1, L: 1, IP: '12.0' } },
   ],
 }
 
@@ -113,6 +114,7 @@ test('splits user-team stats from league stats and labels every league team', as
   fireEvent.click(screen.getByRole('button', { name: '球隊球員數據' }))
   expect(screen.getByRole('heading', { name: '2026 球隊球員數據' })).toBeInTheDocument()
   expect(screen.getByText('我隊打者')).toBeInTheDocument()
+  expect(screen.getByText('投手 · 1勝 1敗')).toBeInTheDocument()
   expect(screen.queryByText('他隊打者')).not.toBeInTheDocument()
 
   fireEvent.click(screen.getByRole('button', { name: '聯盟球員數據' }))
@@ -137,6 +139,10 @@ test('preseason roster builder surfaces server-side star limit rejection', async
   await screen.findByRole('heading', { name: '先發打線' })
   fireEvent.click(screen.getByRole('button', { name: '替換此卡' }))
   expect(await screen.findByText('明星捕手')).toBeInTheDocument()
-  fireEvent.click(screen.getByRole('button', { name: /明星捕手/ }))
+  const candidate = screen.getByRole('button', { name: /明星捕手/ })
+  expect(candidate).toHaveTextContent('Contact 70')
+  expect(candidate).toHaveTextContent('Power 68')
+  expect(candidate).toHaveTextContent('Eye 66')
+  fireEvent.click(candidate)
   expect(await screen.findByRole('alert')).toHaveTextContent('SSR count 3 exceeds cap 2')
 })
