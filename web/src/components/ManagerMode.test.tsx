@@ -16,7 +16,7 @@ const pitcher = (index: number, role: string) => ({
 const positions = ['C', '1B', '2B', '3B', 'SS', 'LF', 'CF', 'RF', 'DH']
 const lineup = positions.map((position, index) => batter(index + 1, position))
 const team = {
-  team_id: 'team-1', name: 'AI Team 1', strategy: 'balanced', games_played: 0,
+  team_id: 'team-1', name: '中信兄弟', strategy: 'balanced', games_played: 0,
   roster_cost: 42, batter_count: 13, rotation_count: 4, bullpen_count: 5,
   next_starter_card_id: 'p-1', lineup,
   bench: positions.slice(0, 4).map((position, index) => ({ ...batter(index + 10, position), team: '測試隊' })),
@@ -38,7 +38,7 @@ const manager = {
     rank, team_id: `team-${rank}`, wins: 0, losses: 0, runs_scored: 0,
     runs_allowed: 0, run_differential: 0, winning_percentage: 0, games_behind: 0,
   })),
-  teams: [team, ...[2, 3, 4, 5, 6].map(index => ({ ...team, team_id: `team-${index}`, name: `AI Team ${index}` }))],
+  teams: [team, ...['統一7-ELEVEn獅', '樂天桃猿', '味全龍', '富邦悍將', '台鋼雄鷹'].map((name, index) => ({ ...team, team_id: `team-${index + 2}`, name }))],
   recent_results: [],
   player_stats: [],
 }
@@ -64,6 +64,17 @@ test('renders server-authoritative roster, standings, ratings, and three control
   expect(screen.queryByText('Overall')).not.toBeInTheDocument()
   expect(screen.queryByText('Fielding')).not.toBeInTheDocument()
   expect(screen.queryByText('Arm')).not.toBeInTheDocument()
+  expect(screen.getByText('中信兄弟 VS 統一7-ELEVEn獅')).toBeInTheDocument()
+})
+
+test('keeps roster editing enabled after the season starts', async () => {
+  const inSeason = { ...manager, games_completed: 1, revision: 2 }
+  vi.mocked(fetch).mockResolvedValueOnce({
+    ok: true, json: () => Promise.resolve({ managers: [inSeason] }),
+  } as Response)
+  render(<ManagerMode onBack={() => undefined} />)
+  expect(await screen.findByRole('button', { name: '替換此卡' })).toBeEnabled()
+  expect(screen.getAllByRole('combobox').some(control => !control.hasAttribute('disabled'))).toBe(true)
 })
 
 test('mobile tabs expose standings and mutation sends current revision', async () => {

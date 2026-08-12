@@ -11,6 +11,14 @@ from .roster import RosterSelection
 
 TEAM_CUSTOMIZATION_VERSION = "manager-team-customization-v0.1"
 UNLIMITED_TEAM_NAME = "8add9"
+AI_CPBL_TEAM_NAMES = (
+    "中信兄弟",
+    "統一7-ELEVEn獅",
+    "樂天桃猿",
+    "味全龍",
+    "富邦悍將",
+    "台鋼雄鷹",
+)
 
 
 @dataclass(frozen=True, slots=True)

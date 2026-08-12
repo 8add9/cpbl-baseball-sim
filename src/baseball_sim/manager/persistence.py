@@ -6,6 +6,7 @@ from dataclasses import asdict, dataclass
 from typing import Any, cast
 
 from .cards import CardCatalog
+from .customization import AI_CPBL_TEAM_NAMES
 from .franchise import (
     ManagerFranchise,
     RewardGrant,
@@ -155,6 +156,31 @@ def _pairs(
     return tuple(pairs)
 
 
+def _aligned_tracking(
+    pairs: tuple[tuple[str, int | None], ...], current_card_ids: tuple[str, ...]
+) -> tuple[tuple[str, int | None], ...]:
+    """Repair saves written before roster swaps updated pitcher tracking keys."""
+    if len(pairs) != len(current_card_ids):
+        return pairs
+    values = dict(pairs)
+    if set(values) == set(current_card_ids):
+        return tuple((card_id, values[card_id]) for card_id in current_card_ids)
+    return tuple(
+        (card_id, pairs[index][1]) for index, card_id in enumerate(current_card_ids)
+    )
+
+
+def _team_name(team_id: str, saved_name: object) -> str:
+    name = str(saved_name).strip()
+    for index, real_name in enumerate(AI_CPBL_TEAM_NAMES, start=1):
+        if team_id == f"team-{index}" and name.casefold() in {
+            f"ai team {index}",
+            f"ai team{index}",
+        }:
+            return real_name
+    return name
+
+
 def manager_state_from_dict(value: object, catalog: CardCatalog) -> ManagerLeagueState:
     root = _dict(value, "Manager save")
     schema_version = root.get("schema_version")
@@ -197,7 +223,7 @@ def manager_state_from_dict(value: object, catalog: CardCatalog) -> ManagerLeagu
             team_id=str(data["team_id"]),
             roster=selection,
             lineup=lineup,
-            name=str(data["name"]),
+            name=_team_name(str(data["team_id"]), data["name"]),
             strategy=str(data["strategy"]),
         )
         create_team_game_roster(
@@ -207,22 +233,24 @@ def manager_state_from_dict(value: object, catalog: CardCatalog) -> ManagerLeagu
             selection.rotation_card_ids[0],
         )
         usage_data = _dict(data.get("usage"), "pitcher usage")
+        last_starts = _aligned_tracking(
+            _pairs(usage_data.get("last_start_games"), "last starts", allow_none=True),
+            selection.rotation_card_ids,
+        )
+        relief_streaks = _aligned_tracking(
+            _pairs(usage_data.get("relief_streaks"), "relief streaks", allow_none=False),
+            selection.bullpen_card_ids,
+        )
         usage = PitcherAvailability(
             catalog=catalog,
             rotation_card_ids=selection.rotation_card_ids,
             bullpen_card_ids=selection.bullpen_card_ids,
             team_games_played=int(usage_data["team_games_played"]),
             next_rotation_index=int(usage_data["next_rotation_index"]),
-            last_start_games=_pairs(
-                usage_data.get("last_start_games"), "last starts", allow_none=True
-            ),
+            last_start_games=last_starts,
             relief_streaks=tuple(
                 (card_id, cast(int, streak))
-                for card_id, streak in _pairs(
-                    usage_data.get("relief_streaks"),
-                    "relief streaks",
-                    allow_none=False,
-                )
+                for card_id, streak in relief_streaks
             ),
         )
         states.append(ManagerTeamState(config, usage))

@@ -6,6 +6,7 @@ from dataclasses import replace
 
 from .cards import CardCatalog
 from .customization import (
+    AI_CPBL_TEAM_NAMES,
     rename_team,
     roster_limits_for_name,
     set_rotation_plan,
@@ -20,20 +21,9 @@ from .league import (
     simulate_manager_season,
     start_next_manager_season,
 )
-from .league import (
-    simulate_next_league_game as simulate_next_domain_game,
-)
+from .league import simulate_next_league_game as simulate_next_domain_game
 from .optimizer import RosterStrategy, build_optimized_roster
 from .roster import RosterRules, RosterSelection, evaluate_roster
-
-AI_CPBL_TEAM_NAMES = (
-    "中信兄弟",
-    "統一7-ELEVEn獅",
-    "樂天桃猿",
-    "味全龍",
-    "富邦悍將",
-    "台鋼雄鷹",
-)
 
 
 def create_ai_league(catalog: CardCatalog, seed: int) -> ManagerLeagueState:
@@ -184,9 +174,7 @@ def replace_team_card(
     outgoing_card_id: str,
     incoming_card_id: str,
 ) -> ManagerLeagueState:
-    """Replace one preseason card and revalidate the complete frozen league."""
-    if state.results:
-        raise ValueError("rosters are locked after the first league game")
+    """Replace one card between games and keep pitcher tracking replayable."""
     if outgoing_card_id == incoming_card_id:
         raise ValueError("incoming and outgoing cards must differ")
     target = next((team for team in state.teams if team.config.team_id == team_id), None)
@@ -224,6 +212,29 @@ def replace_team_card(
         else entry
         for entry in target.config.lineup
     )
+    availability = target.pitcher_availability
+    if group == "rotation":
+        starts = dict(availability.last_start_games)
+        previous = starts.pop(outgoing_card_id)
+        starts[incoming_card_id] = previous
+        availability = replace(
+            availability,
+            rotation_card_ids=groups["rotation"],
+            last_start_games=tuple(
+                (card_id, starts[card_id]) for card_id in groups["rotation"]
+            ),
+        )
+    elif group == "bullpen":
+        streaks = dict(availability.relief_streaks)
+        previous = streaks.pop(outgoing_card_id)
+        streaks[incoming_card_id] = previous
+        availability = replace(
+            availability,
+            bullpen_card_ids=groups["bullpen"],
+            relief_streaks=tuple(
+                (card_id, streaks[card_id]) for card_id in groups["bullpen"]
+            ),
+        )
     legality = evaluate_roster(catalog, replacement, _rules_for_team(state, team_id))
     if not legality.legal:
         raise ValueError(f"illegal replacement roster: {legality.violations}")
@@ -236,6 +247,7 @@ def replace_team_card(
                 lineup=lineup,
                 strategy="custom",
             ),
+            pitcher_availability=availability,
         )
         if team.config.team_id == team_id
         else team

@@ -209,7 +209,7 @@ def test_repository_fails_closed_when_configured_artifact_root_is_invalid(
         SqliteManagerRepository(tmp_path / "manager.sqlite3", tmp_path / "missing")
 
 
-def test_preseason_roster_builder_rejects_star_overload_accepts_legal_swap_and_locks(
+def test_roster_builder_rejects_star_overload_and_accepts_legal_swap(
     tmp_path: Path,
 ) -> None:
     client = _client(tmp_path / "managers.sqlite3")
@@ -258,17 +258,120 @@ def test_preseason_roster_builder_rejects_star_overload_accepts_legal_swap_and_l
         f"/api/managers/{view['manager_id']}/simulate-next-game",
         json=_mutation(changed, "builder-play"),
     ).json()
-    locked = client.post(
+    reopened = client.post(
         f"/api/managers/{view['manager_id']}/replace-card",
         json={
-            **_mutation(played, "builder-locked"),
+            **_mutation(played, "builder-in-season"),
             "team_id": team["team_id"],
             "outgoing_card_id": regular["card_id"],
             "incoming_card_id": outgoing["card_id"],
         },
     )
-    assert locked.status_code == 422
-    assert "locked" in locked.json()["message"]
+    assert reopened.status_code == 200
+    assert reopened.json()["games_completed"] == 1
+
+
+def test_multiple_in_season_roster_swaps_survive_restart_and_continue(
+    tmp_path: Path,
+) -> None:
+    database = tmp_path / "managers.sqlite3"
+    client = _client(database)
+    view = _create(client, "multi-swap-create")
+    manager_id = view["manager_id"]
+    view = client.post(
+        f"/api/managers/{manager_id}/rename-team",
+        json={**_mutation(view, "multi-swap-unlimited"), "name": "8add9"},
+    ).json()
+    view = client.post(
+        f"/api/managers/{manager_id}/simulate-next-game",
+        json=_mutation(view, "multi-swap-play"),
+    ).json()
+
+    for index, group in enumerate(("lineup", "rotation", "bullpen"), start=1):
+        team = next(
+            item for item in view["teams"] if item["team_id"] == view["user_team_id"]
+        )
+        outgoing = team[group][0]
+        candidates = client.get(
+            f"/api/managers/{manager_id}/roster-candidates",
+            params={
+                "team_id": team["team_id"],
+                "outgoing_card_id": outgoing["card_id"],
+            },
+        ).json()["candidates"]
+        incoming = next(
+            item
+            for item in candidates
+            if item["tier"] == "N" and item["role"] == outgoing.get("role")
+        )
+        response = client.post(
+            f"/api/managers/{manager_id}/replace-card",
+            json={
+                **_mutation(view, f"multi-swap-{index}"),
+                "team_id": team["team_id"],
+                "outgoing_card_id": outgoing["card_id"],
+                "incoming_card_id": incoming["card_id"],
+            },
+        )
+        assert response.status_code == 200, response.text
+        view = response.json()
+
+    restarted = _client(database)
+    loaded = restarted.get(f"/api/managers/{manager_id}")
+    assert loaded.status_code == 200
+    assert loaded.json() == view
+    continued = restarted.post(
+        f"/api/managers/{manager_id}/simulate-next-game",
+        json=_mutation(view, "multi-swap-continue"),
+    )
+    assert continued.status_code == 200
+    assert continued.json()["games_completed"] == 2
+
+
+def test_legacy_ai_names_and_stale_pitcher_tracking_are_repaired_on_load(
+    tmp_path: Path,
+) -> None:
+    database = tmp_path / "managers.sqlite3"
+    client = _client(database)
+    view = _create(client, "legacy-repair-create")
+    manager_id = view["manager_id"]
+    team = view["teams"][0]
+    outgoing = team["rotation"][0]["card_id"]
+    candidates = client.get(
+        f"/api/managers/{manager_id}/roster-candidates",
+        params={"team_id": team["team_id"], "outgoing_card_id": outgoing},
+    ).json()["candidates"]
+    incoming = next(item for item in candidates if item["tier"] == "N")["card_id"]
+
+    with sqlite3.connect(database) as connection:
+        raw = connection.execute(
+            "SELECT state_json FROM manager_leagues WHERE manager_id=?", (manager_id,)
+        ).fetchone()[0]
+        payload = json.loads(raw)
+        for index, saved_team in enumerate(payload["teams"], start=1):
+            saved_team["name"] = f"AI Team {index}"
+        payload["teams"][0]["rotation_card_ids"][0] = incoming
+        payload["rotation_plans"][0][1] = [
+            incoming if card_id == outgoing else card_id
+            for card_id in payload["rotation_plans"][0][1]
+        ]
+        connection.execute(
+            "UPDATE manager_leagues SET state_json=? WHERE manager_id=?",
+            (json.dumps(payload), manager_id),
+        )
+
+    repaired = _client(database).get(f"/api/managers/{manager_id}")
+    assert repaired.status_code == 200
+    loaded = repaired.json()
+    assert [item["name"] for item in loaded["teams"]] == [
+        "中信兄弟",
+        "統一7-ELEVEn獅",
+        "樂天桃猿",
+        "味全龍",
+        "富邦悍將",
+        "台鋼雄鷹",
+    ]
+    assert loaded["teams"][0]["rotation"][0]["card_id"] == incoming
 
 
 def test_team_8add9_unlocks_caps_and_rotation_allows_same_starter(
