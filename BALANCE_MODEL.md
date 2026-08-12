@@ -55,3 +55,20 @@ The accepted version must document coefficients, baselines, bounds, interactions
 ## Evidence policy
 
 Use fixed seeds, at least 100,000 PA per golden matchup, effect sizes, confidence intervals where material, property tests over broad inputs, and versioned regression tolerances.
+
+## Manager card economy and release evidence
+
+Manager cards are ranked by analytic gameplay impact against a neutral-65 opponent, not
+by Display ratings or a fabricated Overall. Batter impact is simplified OPS; pitcher
+impact is negative simplified OPS allowed. Completed 1990-2025 pools receive versioned
+percentile tiers: N below 40%, R 40-75%, SR 75-95%, SSR top 5%, with costs 1/3/6/10.
+Competitive rosters contain 22 cards under budget 70, SSR <=2 and SR <=5. Stamina affects
+BF capacity and pitcher usage, never one-PA quality; SpeedProxy remains non-gameplay.
+
+The release gate used common-random-number home/away pairs for six comparisons at 20,000
+games each (120,000 total). Balanced, offense-heavy, and pitching-heavy zero-SSR rosters
+all exceeded a 50.5% observed win rate against the legal reference. Mutual comparisons
+were 47.825%-53.345%, with expected gaps of 1.18-4.01 wins per 120, passing the predeclared
+45%-55% or six-win gate. Exact confidence intervals, seeds, roster CardIDs, and run rates
+are versioned in `research/manager_balance_report.md` and
+`artifacts/research/manager_balance_validation.json`.

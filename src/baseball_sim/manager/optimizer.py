@@ -20,7 +20,7 @@ class RosterStrategy(StrEnum):
 _BATTER_BUDGET_CAP = {
     RosterStrategy.BALANCED: 42,
     RosterStrategy.OFFENSE: 52,
-    RosterStrategy.PITCHING: 30,
+    RosterStrategy.PITCHING: 35,
 }
 
 

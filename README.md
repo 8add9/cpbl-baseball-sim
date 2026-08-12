@@ -2,8 +2,9 @@
 
 Independent, server-authoritative numerical baseball game built from versioned CPBL-derived player-season ratings.
 
-The project is in Phase 1. Foundation through Career Mode 1-1 are complete. Manager Mode
-1-2 is in progress; its versioned card catalog and roster-legality core are complete.
+The Phase 1 Text/Numerical MVP is feature-complete through Career Mode 1-1 and Manager
+Mode 1-2. Final publication/deployment verification is tracked as M7; the separate
+全民打棒球-style Phase 2 is intentionally outside this delivery.
 
 ## Development
 
@@ -62,3 +63,16 @@ season, earn participation XP/development points, train Contact/Power/Eye, inspe
 read-only SpeedProxy, and
 resume an autosaved local career after an API restart. Set `BASEBALL_SIM_DATA_DIR` to
 choose the local SQLite save directory.
+
+Choose **經理模式** to create a deterministic six-team league from real CPBL
+player-season cards. Before opening day, inspect Raw abilities and replace cards; every
+swap is checked server-side against the 70-point budget, SSR/SR caps, positions, roles,
+PlayerID uniqueness, and league ownership. Then simulate one game, one round, or the
+remaining 360-game season and reload the autosaved standings. Manager saves use the same
+data directory in a separate `managers.sqlite3` database.
+
+Reproduce the Manager release balance gate with:
+
+```bash
+python research/manager_balance_validation.py --games 20000 --workers 8
+```

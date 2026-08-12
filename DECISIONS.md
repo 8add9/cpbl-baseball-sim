@@ -166,3 +166,17 @@
   terminate without fabricating a neutral card. This safety exception is provisional
   and must be replaced by deeper roster/fatigue rules in a later model version.
 - **Date:** 2026-08-12
+
+## ADR-017 — Persistent preseason Manager roster editing
+
+- **Decision:** Store Manager leagues in a separate revisioned SQLite database and allow
+  card replacement only before the first scheduled game. Every replacement reconstructs
+  and validates the full six-team league against the pinned catalog snapshot.
+- **Why:** A player must actually build a roster, while budget, tier, position, role,
+  ownership, and replay rules must remain server-authoritative and atomic.
+- **Alternatives:** Trust a browser-only validator; persist entire card payloads; allow
+  midseason roster mutation without a transaction/history model.
+- **Consequences:** Saves contain compact CardID-based state and a catalog fingerprint.
+  Candidate discovery may present illegal star upgrades so the UI can explain rejection,
+  but only a fully legal roster creates a new revision. Opening day freezes rosters.
+- **Date:** 2026-08-12

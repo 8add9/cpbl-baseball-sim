@@ -27,12 +27,20 @@ class ManagerTeamConfig:
     team_id: str
     roster: RosterSelection
     lineup: tuple[LineupEntry, ...]
+    name: str | None = None
+    strategy: str = "custom"
 
     def __post_init__(self) -> None:
         if not self.team_id.strip():
             raise ValueError("Manager team_id cannot be blank")
         if len(self.lineup) != 9:
             raise ValueError("Manager team lineup must contain nine entries")
+        if self.name is None:
+            object.__setattr__(self, "name", self.team_id)
+        elif not self.name.strip():
+            raise ValueError("Manager team name cannot be blank")
+        if not self.strategy.strip():
+            raise ValueError("Manager team strategy cannot be blank")
 
 
 @dataclass(frozen=True, slots=True)

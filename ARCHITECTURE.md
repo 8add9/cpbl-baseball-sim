@@ -79,9 +79,12 @@ Roster legality is a pure aggregate over canonical player-season cards. Static
 family, while Fielding and multi-position skill are explicitly outside this contract.
 The per-game roster layer adds an exact-position lineup, bench, rotation, bullpen,
 PA-boundary substitutions, and Stamina-derived pitcher BF capacity without changing PA
-quality. The season layer owns a deterministic six-team schedule and standings. Manager
-persistence, API, and UI remain later layers and must not weaken the catalog or roster
-validation.
+quality. The season layer owns a deterministic six-team schedule and standings. The
+application layer persists canonical card IDs, frozen schedule identity, pitcher
+availability, results, catalog fingerprint, revision, and compact idempotency metadata
+in a separate SQLite database. FastAPI and React are adapters over that state; neither
+can bypass catalog or roster validation. Preseason replacement rebuilds and validates
+the full six-team league atomically, and the first game locks every roster.
 
 Manager game orchestration connects those layers without introducing a second outcome
 engine. `ManagerGameSession` advances the authoritative M3 state one PA at a time using
@@ -89,3 +92,9 @@ the selected cards' full-precision Raw ratings. `PitcherAvailability` supplies a
 four-man rotation and excludes relievers after two consecutive team games. A complete
 six-team league owns its frozen schedule, usage state, results, and derived standings;
 fixed seeds reproduce the same games and season at domain level.
+
+The Manager UI consumes full-precision Raw ratings for gameplay and displays tiers and
+costs without inventing an Overall rating. Its roster builder fetches compatible real-card
+candidates, but legality remains server-authoritative: budget 70, SSR/SR caps, distinct
+positions, pitching roles, PlayerID uniqueness, and cross-team CardID ownership are
+checked together before a new revision is saved.

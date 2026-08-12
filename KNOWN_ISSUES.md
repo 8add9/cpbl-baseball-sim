@@ -19,8 +19,9 @@ The Text Game currently uses neutral 65-vs-65 fixture cards (`A1`â€“`A9`, `H1`â€
 - Pitcher B_Role extreme tails are dominated by Swingman seasons; role-tail sensitivity remains a monitoring item.
 - 2026 is incomplete and must not enter historical baselines.
 - Overall ratings are not calibrated for the 30â€“110 scale and are excluded from v0.1 single-skill simulation inputs.
-- Career persistence is local SQLite. Deployment persistence and the Manager game-data
-  store remain undecided until hosting requirements are measured.
+- Career and Manager persistence use separate local SQLite databases. A stateless or
+  ephemeral hosting target requires a mounted durable volume; multi-instance database
+  replication is outside the Phase 1 single-instance contract.
 - SpeedProxy is visible but read-only in Career Mode because it has no PA or runner
   effect; training unlocks only after an empirical runner model exists.
 - `ProfilePosition`, Bats, and Throws are static player profiles rather than season-level
@@ -33,9 +34,6 @@ The Text Game currently uses neutral 65-vs-65 fixture cards (`A1`â€“`A9`, `H1`â€
   `bullpen-exhausted-extension` event. This prevents a legal extra-inning game from
   deadlocking and never invents a neutral pitcher, but it is not a claim that fatigue
   disappears; deeper staffs and fatigue-quality effects require a future model version.
-- Manager tier/cost policy has not passed its final 20,000-paired-game balance gate yet.
-  Early fixed-seed samples place zero-SSR strategies near the intended competitive
-  boundary, but they are not sufficient evidence to freeze costs or declare M6 complete.
 - Career save schemas v1-v2 are intentionally rejected by the v3 full-GameState loader;
   no public saves existed before the milestone, so a migration was not retained.
 - `B_QuadraticTanh` is mathematically monotonic for finite real scores, but double precision loses strict distinguishability extremely near the 30/110 asymptotes. Engine validation guarantees round-trip behavior for the supported score domain `[-10, 10]`; endpoints remain display-only labels.

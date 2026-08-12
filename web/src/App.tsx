@@ -2,17 +2,21 @@ import { useState } from 'react'
 import { CareerMode } from './components/CareerMode'
 import { GameControls } from './components/GameControls'
 import { LineupTable } from './components/LineupTable'
+import { ManagerMode } from './components/ManagerMode'
 import { PlayerMatchup } from './components/PlayerMatchup'
 import { PlayLog } from './components/PlayLog'
 import { ScoreRail } from './components/ScoreRail'
 import { useGame } from './useGame'
 
 export function App() {
-  const [mode, setMode] = useState<'game' | 'career'>('game')
+  const [mode, setMode] = useState<'game' | 'career' | 'manager'>('game')
   const { game, busy, error, act, reset } = useGame()
 
   if (mode === 'career') {
     return <CareerMode onBack={() => setMode('game')} />
+  }
+  if (mode === 'manager') {
+    return <ManagerMode onBack={() => setMode('game')} />
   }
 
   if (!game) {
@@ -25,6 +29,7 @@ export function App() {
         <h1><span>CPBL</span> 數據野球</h1>
         <div className="header-actions">
           <button className="mode-link" onClick={() => setMode('career')}>生涯模式</button>
+          <button className="mode-link manager-mode-link" onClick={() => setMode('manager')}>經理模式</button>
           <div className="model-meta"><span>模型 {game.model_version}</span><span>種子 {game.state.seed}</span></div>
           <button className="header-reset" disabled={busy} onClick={reset}>重新開始 <span>↻</span></button>
         </div>

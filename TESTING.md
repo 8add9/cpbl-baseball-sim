@@ -101,9 +101,26 @@ league, and standings conservation (`sum(W) == sum(L)`, `sum(RS) == sum(RA)`). T
 `bullpen-exhausted-extension` path has a dedicated regression fixture and must remain
 visible in the event stream.
 
-The tier/cost policy is not frozen until common-random-number simulations reach at least
-20,000 paired games per candidate strategy and report confidence intervals for non-star
-rosters against the legal budget reference. Small exploratory runs are diagnostics only.
+The frozen release run is reproduced with:
+
+```bash
+python research/manager_balance_validation.py --games 20000 --workers 8
+```
+
+It runs six 20,000-game comparisons (120,000 games total) with paired home/away seeds.
+All zero-SSR strategies must retain a 95% CI lower bound of at least 45% against the legal
+reference and no more than an eight-win deficit per 120. Mutual strategy comparisons
+must remain within 45%-55% or six wins per 120. The checked report and CSV/JSON artifacts
+are under `research/` and `artifacts/research/`.
+
+Manager API tests cover SQLite restart, revision/idempotency conflicts, compact saves,
+corrupt-save isolation, preseason candidate loading, invalid star-card rejection, legal
+replacement, post-opening-day roster lock, full-season conservation, and all 360 games.
+
+Browser QA on 2026-08-12 exercised desktop and 390x844 layouts: create a six-team league,
+inspect real cards, reject an over-budget SSR swap, apply a legal same-tier swap, play one
+Manager game, reload the persistent revision, switch all four mobile tabs, and verify no
+horizontal document overflow or console warnings/errors.
 
 ## Milestone rule
 

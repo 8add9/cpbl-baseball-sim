@@ -123,7 +123,7 @@ Evidence:
 
 ## M6 — Manager Mode 1-2
 
-**Status:** In progress
+**Status:** Complete (2026-08-12)
 
 Acceptance:
 
@@ -150,8 +150,19 @@ Current evidence:
 - Deterministic beam-search roster builders produce balanced, offense-heavy,
   pitching-heavy, and zero-SSR fixtures under the same legality contract. Strategy
   regression tests require distinct card sets and directional batter/pitcher impact.
-- Formal paired balance simulations, Manager persistence, API, and browser UI remain
-  before M6 completion.
+- The release balance run completed 120,000 games: six 20,000-game paired comparisons.
+  All three zero-SSR strategies cleared the reference and mutual-balance gates; mutual
+  gaps were 1.18-4.01 expected wins per 120 games.
+- SQLite Manager saves preserve the catalog fingerprint, rosters, pitcher availability,
+  schedule cursor, results, revisions, and compact idempotency metadata. FastAPI exposes
+  create/load, roster candidates, preseason card replacement, and three simulation speeds.
+- The responsive React dashboard supports multiple saves, real-card inspection,
+  preseason roster replacement with server-side budget/tier/position/role validation,
+  standings, rotation/bullpen status, and season simulation.
+- Browser QA covered create, invalid star-card replacement, valid roster replacement,
+  play one game, restart/load, four mobile tabs, desktop/mobile overflow, and console
+  errors. Python: 181 passed/1 opt-in SQL test skipped. Frontend: 6 tests plus ESLint and
+  production build.
 
 ## M7 — Phase 1 completion
 
@@ -162,4 +173,5 @@ Acceptance:
 
 ## Phase 2 — Operable batting prototype
 
-Begins only after M7. Deliver one polished field, pitcher, batter, pitch, and swing with timing/aiming effects consistent with the Phase 1 rating model.
+Out of the current scope by user direction. Stop after M7; do not begin the
+全民打棒球-style prototype in this delivery.

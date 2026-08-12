@@ -95,7 +95,15 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, init)
   if (!response.ok) {
     const detail = await response.text()
-    throw new Error(detail || `Request failed: ${response.status}`)
+    try {
+      const parsed = JSON.parse(detail) as { message?: string }
+      throw new Error(parsed.message || detail || `Request failed: ${response.status}`)
+    } catch (error) {
+      if (error instanceof SyntaxError) {
+        throw new Error(detail || `Request failed: ${response.status}`)
+      }
+      throw error
+    }
   }
   return response.json() as Promise<T>
 }
@@ -148,6 +156,100 @@ export function mutateCareer(
     method: 'POST', headers: JSON_HEADERS,
     body: JSON.stringify({
       expected_revision: career.revision, operation_id: crypto.randomUUID(), ...extra,
+    }),
+  })
+}
+
+export interface ManagerCard {
+  card_id: string; player_name: string; season_year: number; team: string
+  profile_position: string; role: string | null; tier: string; cost: number
+  abilities: Record<string, number>
+}
+
+export interface ManagerLineupCard extends Omit<ManagerCard, 'team'> {
+  position: string
+}
+
+export interface ManagerTeam {
+  team_id: string; name: string; strategy: string; games_played: number
+  roster_cost: number; batter_count: number; rotation_count: number; bullpen_count: number
+  next_starter_card_id: string; lineup: ManagerLineupCard[]; bench: ManagerCard[]
+  rotation: ManagerCard[]; bullpen: ManagerCard[]; tier_counts: Record<string, number>
+  available_bullpen_card_ids: string[]
+}
+
+export interface ManagerStanding {
+  rank: number; team_id: string; wins: number; losses: number
+  runs_scored: number; runs_allowed: number; run_differential: number
+  winning_percentage: number; games_behind: number
+}
+
+export interface ManagerResult {
+  game_number: number; away_team_id: string; home_team_id: string
+  away_runs: number; home_runs: number
+}
+
+export interface ManagerView {
+  manager_id: string; revision: number; autosaved_at: string
+  persistence_version: string; schema_version: number; model_version: string
+  catalog_snapshot_version: string; catalog_fingerprint: string; seed: number
+  games_completed: number; total_games: number; finished: boolean
+  next_game: null | { game_number: number; round_number: number; away_team_id: string; home_team_id: string }
+  standings: ManagerStanding[]; teams: ManagerTeam[]; recent_results: ManagerResult[]
+}
+
+export async function listManagers(): Promise<ManagerView[]> {
+  const response = await request<{ managers: ManagerView[] }>('/api/managers')
+  return response.managers
+}
+
+export function createManager(seed = 20260812): Promise<ManagerView> {
+  return request('/api/managers', {
+    method: 'POST', headers: JSON_HEADERS,
+    body: JSON.stringify({
+      seed, expected_revision: 0, operation_id: crypto.randomUUID(),
+    }),
+  })
+}
+
+export function mutateManager(
+  manager: ManagerView,
+  action: 'simulate-next-game' | 'simulate-round' | 'simulate-season',
+): Promise<ManagerView> {
+  return request(`/api/managers/${manager.manager_id}/${action}`, {
+    method: 'POST', headers: JSON_HEADERS,
+    body: JSON.stringify({
+      expected_revision: manager.revision, operation_id: crypto.randomUUID(),
+    }),
+  })
+}
+
+export async function listManagerRosterCandidates(
+  manager: ManagerView,
+  teamId: string,
+  outgoingCardId: string,
+): Promise<ManagerCard[]> {
+  const query = new URLSearchParams({ team_id: teamId, outgoing_card_id: outgoingCardId })
+  const response = await request<{ candidates: ManagerCard[] }>(
+    `/api/managers/${manager.manager_id}/roster-candidates?${query}`,
+  )
+  return response.candidates
+}
+
+export function replaceManagerCard(
+  manager: ManagerView,
+  teamId: string,
+  outgoingCardId: string,
+  incomingCardId: string,
+): Promise<ManagerView> {
+  return request(`/api/managers/${manager.manager_id}/replace-card`, {
+    method: 'POST', headers: JSON_HEADERS,
+    body: JSON.stringify({
+      expected_revision: manager.revision,
+      operation_id: crypto.randomUUID(),
+      team_id: teamId,
+      outgoing_card_id: outgoingCardId,
+      incoming_card_id: incomingCardId,
     }),
   })
 }

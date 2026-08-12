@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+from typing import cast
 
 from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
@@ -21,6 +22,13 @@ from baseball_sim.career import (
 )
 from baseball_sim.career import (
     next_pa as play_next_career_pa,
+)
+from baseball_sim.manager.league_service import (
+    create_ai_league,
+    replace_team_card,
+    simulate_league_round,
+    simulate_league_season,
+    simulate_next_league_game,
 )
 
 from .career_repository import (
@@ -44,6 +52,23 @@ from .career_schemas import (
     TrainCareerRequest,
 )
 from .career_views import career_view
+from .manager_repository import (
+    ManagerCorruptError,
+    ManagerNotFoundError,
+    ManagerOperationConflictError,
+    ManagerRevisionConflictError,
+    ManagerValidationError,
+    SqliteManagerRepository,
+)
+from .manager_schemas import (
+    CreateManagerRequest,
+    ManagerCandidateListResponse,
+    ManagerListResponse,
+    ManagerMutationRequest,
+    ManagerViewResponse,
+    ReplaceManagerCardRequest,
+)
+from .manager_views import manager_view, roster_card_view
 from .repository import (
     GameFinishedError,
     GameNotFoundError,
@@ -127,15 +152,28 @@ def _default_career_database() -> Path:
     return root / "careers.sqlite3"
 
 
+def _default_manager_database() -> Path:
+    return _default_career_database().with_name("managers.sqlite3")
+
+
+def _default_rating_artifacts() -> Path:
+    configured = os.getenv("BASEBALL_SIM_RATING_ARTIFACTS")
+    if configured:
+        return Path(configured)
+    return Path(__file__).resolve().parents[3] / "artifacts" / "generated" / "ratings"
+
+
 def create_app(
     repository: InMemoryGameRepository | None = None,
     career_repository: SqliteCareerRepository | None = None,
+    manager_repository: SqliteManagerRepository | None = None,
 ) -> FastAPI:
     sessions = repository or InMemoryGameRepository()
     careers = career_repository or SqliteCareerRepository(_default_career_database())
     application = FastAPI(title="CPBL Baseball Simulator API", version="0.1.0")
     application.state.game_repository = sessions
     application.state.career_repository = careers
+    application.state.manager_repository = manager_repository
 
     @application.exception_handler(GameNotFoundError)
     async def game_not_found(_request: Request, _error: GameNotFoundError) -> JSONResponse:
@@ -187,6 +225,44 @@ def create_app(
     @application.exception_handler(CareerValidationError)
     async def career_invalid(_request: Request, error: CareerValidationError) -> JSONResponse:
         body = ErrorResponse(code="career_invalid", message=str(error))
+        return JSONResponse(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            content=body.model_dump(),
+        )
+
+    @application.exception_handler(ManagerNotFoundError)
+    async def manager_not_found(
+        _request: Request, _error: ManagerNotFoundError
+    ) -> JSONResponse:
+        body = ErrorResponse(code="manager_not_found", message="Manager league was not found.")
+        return JSONResponse(status_code=status.HTTP_404_NOT_FOUND, content=body.model_dump())
+
+    @application.exception_handler(ManagerRevisionConflictError)
+    async def manager_revision_conflict(
+        _request: Request, error: ManagerRevisionConflictError
+    ) -> JSONResponse:
+        body = ErrorResponse(code="revision_conflict", message=str(error))
+        return JSONResponse(status_code=status.HTTP_409_CONFLICT, content=body.model_dump())
+
+    @application.exception_handler(ManagerOperationConflictError)
+    async def manager_operation_conflict(
+        _request: Request, error: ManagerOperationConflictError
+    ) -> JSONResponse:
+        body = ErrorResponse(code="operation_conflict", message=str(error))
+        return JSONResponse(status_code=status.HTTP_409_CONFLICT, content=body.model_dump())
+
+    @application.exception_handler(ManagerCorruptError)
+    async def manager_corrupt(
+        _request: Request, error: ManagerCorruptError
+    ) -> JSONResponse:
+        body = ErrorResponse(code="manager_corrupt", message=str(error))
+        return JSONResponse(status_code=status.HTTP_409_CONFLICT, content=body.model_dump())
+
+    @application.exception_handler(ManagerValidationError)
+    async def manager_invalid(
+        _request: Request, error: ManagerValidationError
+    ) -> JSONResponse:
+        body = ErrorResponse(code="manager_invalid", message=str(error))
         return JSONResponse(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             content=body.model_dump(),
@@ -426,6 +502,194 @@ def create_app(
             ),
         )
         return career_view(record)
+
+    def manager_backend() -> SqliteManagerRepository:
+        backend = application.state.manager_repository
+        if backend is None:
+            backend = SqliteManagerRepository(
+                _default_manager_database(), _default_rating_artifacts()
+            )
+            application.state.manager_repository = backend
+        return cast(SqliteManagerRepository, backend)
+
+    @application.post(
+        "/api/managers",
+        response_model=ManagerViewResponse,
+        status_code=status.HTTP_201_CREATED,
+        responses={409: {"model": ErrorResponse}, 422: {"model": ErrorResponse}},
+    )
+    def create_manager_endpoint(request: CreateManagerRequest) -> ManagerViewResponse:
+        backend = manager_backend()
+        record = backend.create(
+            operation_id=request.operation_id,
+            expected_revision=request.expected_revision,
+            request_payload=request.model_dump(mode="json"),
+            state_factory=lambda catalog: create_ai_league(catalog, request.seed),
+        )
+        return manager_view(record, backend.catalog)
+
+    @application.get("/api/managers", response_model=ManagerListResponse)
+    def list_managers() -> ManagerListResponse:
+        backend = manager_backend()
+        return ManagerListResponse(
+            managers=[manager_view(record, backend.catalog) for record in backend.list()]
+        )
+
+    @application.get(
+        "/api/managers/{manager_id}",
+        response_model=ManagerViewResponse,
+        responses={404: {"model": ErrorResponse}, 409: {"model": ErrorResponse}},
+    )
+    def get_manager(manager_id: str) -> ManagerViewResponse:
+        backend = manager_backend()
+        return manager_view(backend.get(manager_id), backend.catalog)
+
+    @application.get(
+        "/api/managers/{manager_id}/roster-candidates",
+        response_model=ManagerCandidateListResponse,
+    )
+    def manager_roster_candidates(
+        manager_id: str, team_id: str, outgoing_card_id: str
+    ) -> ManagerCandidateListResponse:
+        backend = manager_backend()
+        state = backend.get(manager_id).state
+        target = next(
+            (team for team in state.teams if team.config.team_id == team_id), None
+        )
+        if target is None:
+            raise ManagerValidationError(f"unknown Manager team: {team_id}")
+        roster = target.config.roster
+        if outgoing_card_id not in roster.all_card_ids:
+            raise ManagerValidationError("outgoing card is not on the selected team")
+        claimed = {
+            card_id for team in state.teams for card_id in team.config.roster.all_card_ids
+        }
+        remaining_player_ids = {
+            backend.catalog.get(card_id).card.player_id
+            for card_id in roster.all_card_ids
+            if card_id != outgoing_card_id
+        }
+        lineup_entry = next(
+            (entry for entry in target.config.lineup if entry.card_id == outgoing_card_id),
+            None,
+        )
+        if outgoing_card_id in roster.batter_card_ids:
+            group = "batter"
+        elif outgoing_card_id in roster.rotation_card_ids:
+            group = "rotation"
+        else:
+            group = "bullpen"
+        candidates = []
+        for entry in backend.catalog.entries(competitive_only=True):
+            card = entry.card
+            if card.card_id in claimed or card.player_id in remaining_player_ids:
+                continue
+            if group == "batter" and card.kind.value != "batter":
+                continue
+            if group == "rotation" and (
+                card.pitcher_role is None or card.pitcher_role.value != "SP"
+            ):
+                continue
+            if group == "bullpen" and (
+                card.pitcher_role is None
+                or card.pitcher_role.value not in {"RP", "Swingman"}
+            ):
+                continue
+            if lineup_entry is not None and lineup_entry.position not in card.eligible_positions:
+                continue
+            candidates.append(entry)
+        tier_order = {"SSR": 0, "SR": 1, "R": 2, "N": 3}
+        candidates.sort(
+            key=lambda entry: (
+                tier_order[entry.tier.value if entry.tier is not None else "N"],
+                -entry.impact,
+                entry.card.card_id,
+            )
+        )
+        # Preserve up to fifteen candidates per tier so both star-cap rejection and
+        # affordable legal swaps are available to the browser roster builder.
+        sampled = [
+            entry
+            for tier in ("SSR", "SR", "R", "N")
+            for entry in [item for item in candidates if item.tier and item.tier.value == tier][
+                :15
+            ]
+        ]
+        return ManagerCandidateListResponse(
+            candidates=[roster_card_view(entry) for entry in sampled]
+        )
+
+    @application.post(
+        "/api/managers/{manager_id}/replace-card",
+        response_model=ManagerViewResponse,
+    )
+    def replace_manager_card_endpoint(
+        manager_id: str, request: ReplaceManagerCardRequest
+    ) -> ManagerViewResponse:
+        backend = manager_backend()
+        record = backend.mutate(
+            manager_id=manager_id,
+            operation_id=request.operation_id,
+            action="replace-card",
+            expected_revision=request.expected_revision,
+            request_payload=request.model_dump(mode="json"),
+            operation=lambda state, catalog: replace_team_card(
+                state,
+                catalog,
+                team_id=request.team_id,
+                outgoing_card_id=request.outgoing_card_id,
+                incoming_card_id=request.incoming_card_id,
+            ),
+        )
+        return manager_view(record, backend.catalog)
+
+    def mutate_manager(
+        manager_id: str,
+        request: ManagerMutationRequest,
+        action: str,
+    ) -> ManagerViewResponse:
+        backend = manager_backend()
+        operations = {
+            "simulate-next-game": simulate_next_league_game,
+            "simulate-round": simulate_league_round,
+            "simulate-season": simulate_league_season,
+        }
+        record = backend.mutate(
+            manager_id=manager_id,
+            operation_id=request.operation_id,
+            action=action,
+            expected_revision=request.expected_revision,
+            request_payload=request.model_dump(mode="json"),
+            operation=operations[action],
+        )
+        return manager_view(record, backend.catalog)
+
+    @application.post(
+        "/api/managers/{manager_id}/simulate-next-game",
+        response_model=ManagerViewResponse,
+    )
+    def simulate_manager_next_game_endpoint(
+        manager_id: str, request: ManagerMutationRequest
+    ) -> ManagerViewResponse:
+        return mutate_manager(manager_id, request, "simulate-next-game")
+
+    @application.post(
+        "/api/managers/{manager_id}/simulate-round",
+        response_model=ManagerViewResponse,
+    )
+    def simulate_manager_round_endpoint(
+        manager_id: str, request: ManagerMutationRequest
+    ) -> ManagerViewResponse:
+        return mutate_manager(manager_id, request, "simulate-round")
+
+    @application.post(
+        "/api/managers/{manager_id}/simulate-season",
+        response_model=ManagerViewResponse,
+    )
+    def simulate_manager_season_endpoint(
+        manager_id: str, request: ManagerMutationRequest
+    ) -> ManagerViewResponse:
+        return mutate_manager(manager_id, request, "simulate-season")
 
     return application
 
