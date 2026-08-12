@@ -37,6 +37,7 @@ packages = ["src/baseball_sim"]
 [tool.pytest.ini_options]
 addopts = "-ra --strict-markers"
 testpaths = ["tests"]
+pythonpath = ["."]
 markers = [
   "monte_carlo: long-running statistical regression",
   "integration: crosses package or external boundaries",
