@@ -22,7 +22,7 @@ from .league import (
     ManagerTeamState,
 )
 from .player_stats import BatterStatLine, PitcherStatLine, PlayerSeasonStat
-from .roster import RosterSelection
+from .roster import RosterRules, RosterSelection
 from .season import GameResult, generate_schedule
 from .usage import PitcherAvailability
 
@@ -226,11 +226,21 @@ def manager_state_from_dict(value: object, catalog: CardCatalog) -> ManagerLeagu
             name=_team_name(str(data["team_id"]), data["name"]),
             strategy=str(data["strategy"]),
         )
+        structural_rules = RosterRules(
+            roster_size=len(selection.all_card_ids),
+            batter_count=len(selection.batter_card_ids),
+            rotation_count=len(selection.rotation_card_ids),
+            bullpen_count=len(selection.bullpen_card_ids),
+            budget=None,
+            max_ssr=None,
+            max_sr=len(selection.all_card_ids),
+        )
         create_team_game_roster(
             catalog,
             selection,
             lineup,
             selection.rotation_card_ids[0],
+            rules=structural_rules,
         )
         usage_data = _dict(data.get("usage"), "pitcher usage")
         last_starts = _aligned_tracking(

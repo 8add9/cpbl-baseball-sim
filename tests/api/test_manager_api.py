@@ -374,6 +374,42 @@ def test_legacy_ai_names_and_stale_pitcher_tracking_are_repaired_on_load(
     assert loaded["teams"][0]["rotation"][0]["card_id"] == incoming
 
 
+def test_over_budget_roster_is_editable_state_not_a_corrupt_save(tmp_path: Path) -> None:
+    database = tmp_path / "managers.sqlite3"
+    client = _client(database)
+    view = _create(client, "over-budget-create")
+    manager_id = view["manager_id"]
+    view = client.post(
+        f"/api/managers/{manager_id}/rename-team",
+        json={**_mutation(view, "over-budget-unlock"), "name": "8add9"},
+    ).json()
+    team = view["teams"][0]
+    outgoing = min(team["lineup"], key=lambda item: item["cost"])
+    candidates = client.get(
+        f"/api/managers/{manager_id}/roster-candidates",
+        params={"team_id": team["team_id"], "outgoing_card_id": outgoing["card_id"]},
+    ).json()["candidates"]
+    incoming = next(item for item in candidates if item["tier"] == "SSR")
+    view = client.post(
+        f"/api/managers/{manager_id}/replace-card",
+        json={
+            **_mutation(view, "over-budget-star"),
+            "team_id": team["team_id"],
+            "outgoing_card_id": outgoing["card_id"],
+            "incoming_card_id": incoming["card_id"],
+        },
+    ).json()
+    view = client.post(
+        f"/api/managers/{manager_id}/rename-team",
+        json={**_mutation(view, "over-budget-lock"), "name": "中信兄弟"},
+    ).json()
+    assert view["teams"][0]["roster_cost"] > 70
+
+    loaded = _client(database).get(f"/api/managers/{manager_id}")
+    assert loaded.status_code == 200
+    assert loaded.json() == view
+
+
 def test_team_8add9_unlocks_caps_and_rotation_allows_same_starter(
     tmp_path: Path,
 ) -> None:
