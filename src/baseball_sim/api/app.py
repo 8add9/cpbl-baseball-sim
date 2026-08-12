@@ -9,6 +9,7 @@ from typing import cast
 from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from baseball_sim.career import (
     CareerState,
@@ -690,6 +691,15 @@ def create_app(
         manager_id: str, request: ManagerMutationRequest
     ) -> ManagerViewResponse:
         return mutate_manager(manager_id, request, "simulate-season")
+
+    static_root = Path(
+        os.getenv(
+            "BASEBALL_SIM_WEB_DIST",
+            str(Path(__file__).resolve().parents[3] / "web" / "dist"),
+        )
+    )
+    if static_root.is_dir():
+        application.mount("/", StaticFiles(directory=static_root, html=True), name="web")
 
     return application
 

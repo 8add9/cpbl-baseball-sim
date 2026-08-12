@@ -122,6 +122,11 @@ inspect real cards, reject an over-budget SSR swap, apply a legal same-tier swap
 Manager game, reload the persistent revision, switch all four mobile tabs, and verify no
 horizontal document overflow or console warnings/errors.
 
+GitHub Actions repeats Python tests/Ruff/mypy, frontend tests/ESLint/build/audit, and a
+production multi-stage container build. The container smoke gate must serve `/`,
+`/api/games`, Career, and Manager endpoints from one origin while the SQLite volume
+survives a container restart.
+
 ## Milestone rule
 
 A green build is insufficient. Each milestone requires its acceptance tests, actual execution, QA evidence, bug fixes, and current documentation.

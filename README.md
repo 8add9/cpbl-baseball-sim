@@ -76,3 +76,17 @@ Reproduce the Manager release balance gate with:
 ```bash
 python research/manager_balance_validation.py --games 20000 --workers 8
 ```
+
+## Production container
+
+The private release repository includes the hash-pinned `rating-snapshot-v0.2` runtime
+artifact. Build and run the single-instance P1 service with:
+
+```bash
+docker compose up --build -d
+```
+
+Open `http://localhost:8000`. The production image builds React, serves it from the
+FastAPI process, exposes the API on the same origin, and stores Career/Manager SQLite
+saves in the `baseball-sim-data` volume. Do not publish the repository or container until
+CPBL-derived names/data licensing has been reviewed.

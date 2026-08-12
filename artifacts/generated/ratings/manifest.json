@@ -1,0 +1,66 @@
+{
+  "as_of_date": "2026-08-11",
+  "engine_version": "rating-engine-v0.1",
+  "inputs": {
+    "batter_research": {
+      "path": "rating_scale_comparison.csv",
+      "sha256": "65d1f51dde07db7a1a7562c4c18f63e53f63dd702f7a35cf414a40a41b25e89f"
+    },
+    "pitcher_research": {
+      "path": "pitching_rating_scale_comparison.csv",
+      "sha256": "1b6f7d3221a0888d31ac2c0461de16f0c926991c4b5feab73fc3da6a819d7b1c"
+    }
+  },
+  "invariants": {
+    "overall_included": false,
+    "season_2026_calibration_reference": false,
+    "season_2026_incomplete": true,
+    "simulation_uses_raw_not_display": true
+  },
+  "mapping_version": "B_QuadraticTanh-v1",
+  "models": {
+    "batter": "A_WinsorizedBalanced-v0.1",
+    "pitcher": "B_Role-v0.1"
+  },
+  "outputs": {
+    "batter": {
+      "path": "batter_season_ratings.csv",
+      "rows": 3035,
+      "sha256": "ebfd07df86ef07987b5fc5990b3de7683c338dc82d1710e1e3aecf410643495a"
+    },
+    "pitcher": {
+      "path": "pitcher_season_ratings.csv",
+      "rows": 2125,
+      "sha256": "b2e285bbafc0831916d081d3a28607d882d9ca777be025aa50e6f9a3f954cadc"
+    },
+    "player_profiles": {
+      "path": "player_profiles.csv",
+      "rows": 2138,
+      "sha256": "a52630e2761c026f22429fe2d38c8d7b2a227caaa15ad946cc3c7e07901c6243",
+      "version": "player-profile-v0.1"
+    }
+  },
+  "schema_version": "rating-snapshot-v0.2",
+  "source_database": {
+    "database": "BaseballRealData",
+    "identity": "baseball_game_reader",
+    "tables": {
+      "BattingStats": {
+        "checksum": 2133817413,
+        "rows": 4190
+      },
+      "PitchingStats": {
+        "checksum": -2056893242,
+        "rows": 3468
+      },
+      "Players": {
+        "checksum": 1308854997,
+        "rows": 2138
+      },
+      "Teams": {
+        "checksum": -640868189,
+        "rows": 17
+      }
+    }
+  }
+}

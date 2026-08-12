@@ -1,0 +1,12 @@
+services:
+  baseball-sim:
+    build: .
+    container_name: cpbl-baseball-sim
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      - baseball-sim-data:/data
+
+volumes:
+  baseball-sim-data:

@@ -9,7 +9,10 @@ __pycache__/
 .coverage
 htmlcov/
 .env
-artifacts/generated/
+artifacts/generated/*
+!artifacts/generated/ratings/
+!artifacts/generated/ratings/*.csv
+!artifacts/generated/ratings/manifest.json
 *.log
 web/node_modules/
 web/dist/
