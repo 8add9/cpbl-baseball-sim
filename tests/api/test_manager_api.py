@@ -486,6 +486,28 @@ def test_team_8add9_unlocks_caps_and_rotation_allows_same_starter(
         assert response.status_code == 200, response.text
         expanded = response.json()
 
+    expanded_team = next(
+        team for team in expanded["teams"] if team["team_id"] == expanded["user_team_id"]
+    )
+    reordered = [
+        expanded_team["lineup"][1],
+        expanded_team["lineup"][0],
+        *expanded_team["lineup"][2:],
+    ]
+    lineup_response = client.post(
+        f"/api/managers/{manager_id}/lineup",
+        json={
+            **_mutation(expanded, "unlimited-lineup"),
+            "lineup": [
+                {"card_id": card["card_id"], "position": card["position"]}
+                for card in reordered
+            ],
+        },
+    )
+    assert lineup_response.status_code == 200, lineup_response.text
+    expanded = lineup_response.json()
+    assert expanded["teams"][0]["lineup"][0]["card_id"] == reordered[0]["card_id"]
+
     played = client.post(
         f"/api/managers/{manager_id}/simulate-next-game",
         json=_mutation(expanded, "unlimited-play"),

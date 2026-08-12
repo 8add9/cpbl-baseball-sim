@@ -137,7 +137,12 @@ def update_user_lineup(
     state: ManagerLeagueState, lineup: tuple[LineupEntry, ...]
 ) -> ManagerLeagueState:
     target = next(team for team in state.teams if team.config.team_id == state.user_team_id)
-    validated = set_starting_lineup(state.catalog, target.config.roster, lineup)
+    validated = set_starting_lineup(
+        state.catalog,
+        target.config.roster,
+        lineup,
+        _rules_for_team(state, state.user_team_id),
+    )
     teams = tuple(
         replace(team, config=replace(team.config, lineup=validated, strategy="custom"))
         if team.config.team_id == state.user_team_id

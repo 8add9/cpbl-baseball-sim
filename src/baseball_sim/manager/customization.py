@@ -7,7 +7,7 @@ from dataclasses import dataclass, replace
 from .cards import CardCatalog
 from .game_roster import LineupEntry, create_team_game_roster
 from .league import ManagerTeamConfig
-from .roster import RosterSelection
+from .roster import DEFAULT_ROSTER_RULES, RosterRules, RosterSelection
 
 TEAM_CUSTOMIZATION_VERSION = "manager-team-customization-v0.1"
 UNLIMITED_TEAM_NAME = "8add9"
@@ -72,6 +72,7 @@ def set_starting_lineup(
     catalog: CardCatalog,
     selection: RosterSelection,
     lineup: tuple[LineupEntry, ...],
+    rules: RosterRules = DEFAULT_ROSTER_RULES,
 ) -> tuple[LineupEntry, ...]:
     """Validate any nine roster batters in any batting order at exact positions."""
     create_team_game_roster(
@@ -79,6 +80,7 @@ def set_starting_lineup(
         selection,
         lineup,
         selection.rotation_card_ids[0],
+        rules=rules,
     )
     return lineup
 
