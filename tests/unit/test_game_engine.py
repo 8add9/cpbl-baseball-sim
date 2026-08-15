@@ -4,7 +4,7 @@ from dataclasses import replace
 
 import pytest
 
-from baseball_sim.game import GameState, HalfInning, Team, apply_outcome, replay
+from baseball_sim.game import GameState, HalfInning, Team, apply_outcome, apply_steal, replay
 from baseball_sim.simulation.outcomes import Outcome
 
 
@@ -189,3 +189,16 @@ def test_finished_game_rejects_more_outcomes(game: GameState) -> None:
 def test_replay_is_deterministic(game: GameState) -> None:
     outcomes = [Outcome.BB, Outcome.DOUBLE, Outcome.SO, Outcome.OUT, Outcome.HR, Outcome.OUT]
     assert replay(game, outcomes) == replay(game, outcomes)
+
+
+def test_steal_is_a_non_pa_transition_and_caught_stealing_can_end_half(
+    game: GameState,
+) -> None:
+    runner = replace(game, bases=("A1", None, None), plate_appearances=7)
+    stolen = apply_steal(runner, "A1", 1, success=True)
+    assert stolen.state.bases == (None, "A1", None)
+    assert stolen.state.plate_appearances == 7
+    caught = apply_steal(replace(runner, outs=2), "A1", 1, success=False)
+    assert caught.inning_ended
+    assert caught.state.half is HalfInning.BOTTOM
+    assert caught.state.plate_appearances == 7

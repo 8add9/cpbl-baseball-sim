@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 
+from .approach import BattingApproach
 from .calendar_v4 import (
     CALENDAR_MODEL_VERSION,
     CareerCalendar,
@@ -27,13 +28,21 @@ from .lifecycle_v4 import (
     begin_day,
     complete_day_action,
     finish_game,
+    reach_player_pa,
+    resolve_player_pa,
     submit_week_plan,
 )
 from .lifecycle_v4 import (
     advance_day as advance_lifecycle_day,
 )
 from .models import CareerState
-from .simulation import advance_season, play_game
+from .simulation import (
+    BaserunningStrategy,
+    advance_season,
+    play_game,
+    prepare_player_pa,
+    resolve_prepared_player_pa,
+)
 from .team_status import TeamStanding
 from .weekly import (
     WEEKLY_ACTION_POINTS,
@@ -153,6 +162,96 @@ def _reset_development_for_week(development: WeeklyDevelopment, week: int) -> We
     )
 
 
+def _advance_after_completed_day(
+    aggregate: CareerAggregateV4,
+    *,
+    lifecycle: CareerLifecycle,
+    condition: CareerCondition,
+) -> CareerAggregateV4:
+    condition = age_condition(condition)
+    lifecycle = advance_lifecycle_day(lifecycle)
+    development = aggregate.weekly_development
+    current_plan: WeekPlan | None = aggregate.current_plan
+    if lifecycle.phase is CareerPhase.WEEK_REVIEW:
+        lifecycle = advance_week(lifecycle)
+        current_plan = None
+        if lifecycle.phase is CareerPhase.WEEK_PLANNING:
+            development = _reset_development_for_week(development, lifecycle.week)
+    return replace(
+        aggregate,
+        lifecycle=lifecycle,
+        weekly_development=development,
+        condition=condition,
+        current_plan=current_plan,
+    )
+
+
+def start_interactive_game(aggregate: CareerAggregateV4) -> CareerAggregateV4:
+    """Enter today's game and stop before the created player's first PA."""
+    if aggregate.current_plan is None:
+        raise ValueError("a week plan must be submitted before starting a game")
+    day = aggregate.calendar.week_days(aggregate.lifecycle.week)[aggregate.lifecycle.weekday - 1]
+    if not day.is_game_day:
+        raise ValueError("today is not a game day")
+    lifecycle = begin_day(aggregate.lifecycle, day)
+    career = prepare_player_pa(aggregate.career)
+    lifecycle = (
+        finish_game(lifecycle)
+        if career.active_game is None
+        else reach_player_pa(lifecycle)
+    )
+    return replace(aggregate, career=career, lifecycle=lifecycle)
+
+
+def resolve_interactive_pa(
+    aggregate: CareerAggregateV4,
+    *,
+    approach: BattingApproach,
+    baserunning: BaserunningStrategy,
+) -> CareerAggregateV4:
+    lifecycle = resolve_player_pa(aggregate.lifecycle)
+    career = resolve_prepared_player_pa(
+        aggregate.career,
+        approach=approach,
+        context=aggregate.condition,
+        baserunning=baserunning,
+    )
+    lifecycle = (
+        finish_game(lifecycle)
+        if career.active_game is None
+        else reach_player_pa(lifecycle)
+    )
+    return replace(aggregate, career=career, lifecycle=lifecycle)
+
+
+def simulate_interactive_game(aggregate: CareerAggregateV4) -> CareerAggregateV4:
+    """Finish an entered game with Normal/Balanced decisions."""
+    result = aggregate
+    if result.lifecycle.phase is CareerPhase.DAY_READY:
+        result = start_interactive_game(result)
+    for _ in range(20):
+        if result.lifecycle.phase is CareerPhase.POST_GAME:
+            return result
+        if result.lifecycle.phase is not CareerPhase.PLAYER_PA:
+            raise ValueError("the career is not at a playable game phase")
+        result = resolve_interactive_pa(
+            result,
+            approach=BattingApproach.NORMAL,
+            baserunning=BaserunningStrategy.BALANCED,
+        )
+    raise RuntimeError("career game exceeded the player-PA safety limit")
+
+
+def acknowledge_interactive_game(aggregate: CareerAggregateV4) -> CareerAggregateV4:
+    lifecycle = acknowledge_post_game(aggregate.lifecycle)
+    condition = apply_activity(aggregate.condition, CareerActivity.STARTER_GAME)
+    return _advance_after_completed_day(
+        aggregate,
+        lifecycle=lifecycle,
+        condition=condition,
+    )
+
+
 def advance_one_day(aggregate: CareerAggregateV4) -> CareerAggregateV4:
     """Resolve exactly the lifecycle cursor day and atomically cross its week boundary."""
 
@@ -196,21 +295,17 @@ def advance_one_day(aggregate: CareerAggregateV4) -> CareerAggregateV4:
         else:
             condition = apply_activity(condition, CareerActivity.NONE)
         lifecycle = complete_day_action(lifecycle)
-    condition = age_condition(condition)
-    lifecycle = advance_lifecycle_day(lifecycle)
-    current_plan: WeekPlan | None = aggregate.current_plan
-    if lifecycle.phase is CareerPhase.WEEK_REVIEW:
-        lifecycle = advance_week(lifecycle)
-        current_plan = None
-        if lifecycle.phase is CareerPhase.WEEK_PLANNING:
-            development = _reset_development_for_week(development, lifecycle.week)
-    return replace(
+    advanced = replace(
         aggregate,
         career=career,
         lifecycle=lifecycle,
         weekly_development=development,
         condition=condition,
-        current_plan=current_plan,
+    )
+    return _advance_after_completed_day(
+        advanced,
+        lifecycle=lifecycle,
+        condition=condition,
     )
 
 

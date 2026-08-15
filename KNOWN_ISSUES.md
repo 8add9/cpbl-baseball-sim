@@ -2,7 +2,7 @@
 
 ## Station-to-station runner advancement
 
-The v0.1 game state advances every runner exactly the hit's base value and holds all runners on outs. It cannot represent sacrifice flies, double plays, errors, fielder's choices, first-to-third, scoring from second on a single, wild pitches, passed balls, SpeedProxy, Fielding, or Arm. Full-game scoring and LOB distributions are therefore provisional even though state transitions are deterministic and legal.
+The general v0.1 game state advances every runner exactly the hit's base value and holds all runners on outs. Career Mode adds a versioned created-player-only steal/extra-base layer driven by SpeedProxy, but still cannot represent sacrifice flies, double plays, errors, fielder's choices, wild pitches, passed balls, Fielding, or Arm. Full-game scoring and LOB distributions are therefore provisional even though state transitions are deterministic and legal.
 
 `station-to-station-v0.1` is stored as a rules version so future empirical advancement logic does not silently alter old saves or replays.
 
@@ -22,8 +22,8 @@ The Text Game currently uses neutral 65-vs-65 fixture cards (`A1`â€“`A9`, `H1`â€
 - Career and Manager persistence use separate local SQLite databases. A stateless or
   ephemeral hosting target requires a mounted durable volume; multi-instance database
   replication is outside the Phase 1 single-instance contract.
-- SpeedProxy is visible but read-only in Career Mode because it has no PA or runner
-  effect; training unlocks only after an empirical runner model exists.
+- SpeedProxy affects Career steal attempts, steal success, and selected extra-base
+  advancement; it still does not represent Statcast sprint speed or team-wide running.
 - `ProfilePosition`, Bats, and Throws are static player profiles rather than season-level
   histories. LF/CF/RF may satisfy the OF roster family, but Fielding and multi-position
   eligibility remain unmodeled. Transfer-card Team values are aggregated display labels,

@@ -47,6 +47,13 @@ class AdvanceCareerDayRequest(CareerV4Mutation):
     pass
 
 
+class ResolveCareerPARequest(CareerV4Mutation):
+    approach: Literal[
+        "normal", "aggressive", "patient", "power_swing", "contact", "situational"
+    ]
+    baserunning: Literal["conservative", "balanced", "aggressive"]
+
+
 class CareerV4CalendarDay(BaseModel):
     weekday: int
     is_game_day: bool
@@ -69,10 +76,26 @@ class CareerV4Stats(BaseModel):
     home_runs: int
     walks: int
     strikeouts: int
+    runs: int
+    rbi: int
+    stolen_bases: int
+    caught_stealing: int
     avg: float
     obp: float
     slg: float
     ops: float
+
+
+class CareerV4ActiveGame(BaseModel):
+    inning: int
+    half: str
+    outs: int
+    bases: tuple[bool, bool, bool]
+    away_score: int
+    home_score: int
+    player_on_base: int | None
+    last_outcome: str | None
+    season_game_number: int
 
 
 class CareerV4Dashboard(BaseModel):
@@ -110,3 +133,4 @@ class CareerV4Dashboard(BaseModel):
     available_actions: list[str]
     season_award: str | None
     contract_summary: str | None
+    active_game: CareerV4ActiveGame | None

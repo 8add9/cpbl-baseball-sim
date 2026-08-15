@@ -8,22 +8,34 @@ from fastapi import APIRouter, status
 
 from baseball_sim.career.aggregate_v4 import (
     CareerAggregateV4,
+    acknowledge_interactive_game,
     advance_career_phase,
     advance_one_day,
     create_v4_aggregate,
     migrate_v3_career,
+    resolve_interactive_pa,
     simulate_current_week,
+    simulate_interactive_game,
     simulate_regular_season,
+    start_interactive_game,
     submit_plan,
 )
+from baseball_sim.career.approach import BattingApproach
 from baseball_sim.career.calendar_v4 import PlannedAction, Weekday
 from baseball_sim.career.lifecycle_v4 import CareerPhase
-from baseball_sim.career.models import BatterSkill, BattingStats, create_career
+from baseball_sim.career.models import (
+    BatterSkill,
+    BattingStats,
+    PlateAppearancePlayedEvent,
+    create_career,
+)
 from baseball_sim.career.persistence_v4 import CareerV4Record, SqliteCareerV4Repository
+from baseball_sim.career.simulation import BaserunningStrategy
 
 from .career_repository import SqliteCareerRepository
 from .career_v4_schemas import (
     AdvanceCareerDayRequest,
+    CareerV4ActiveGame,
     CareerV4CalendarDay,
     CareerV4Dashboard,
     CareerV4Skill,
@@ -32,6 +44,7 @@ from .career_v4_schemas import (
     MigrateCareerV4Request,
     PlanCareerWeekRequest,
     PlannedActionRequest,
+    ResolveCareerPARequest,
 )
 
 
@@ -72,6 +85,10 @@ def _dashboard(record: CareerV4Record) -> CareerV4Dashboard:
             home_runs=value.home_runs,
             walks=value.walks,
             strikeouts=value.strikeouts,
+            runs=value.runs,
+            rbi=value.rbi,
+            stolen_bases=value.stolen_bases,
+            caught_stealing=value.caught_stealing,
             avg=value.avg,
             obp=value.obp,
             slg=value.slg,
@@ -81,7 +98,9 @@ def _dashboard(record: CareerV4Record) -> CareerV4Dashboard:
     phase = aggregate.lifecycle.phase
     available = {
         "week_planning": ["plan_week"],
-        "day_ready": ["advance_day", "simulate_week", "simulate_season"],
+        "day_ready": ["advance_day", "play_game", "simulate_week", "simulate_season"],
+        "player_pa": ["resolve_pa", "simulate_game"],
+        "post_game": ["acknowledge_game"],
         "season_review": ["advance_phase"],
         "awards": ["advance_phase"],
         "contract": ["advance_phase"],
@@ -104,6 +123,38 @@ def _dashboard(record: CareerV4Record) -> CareerV4Dashboard:
             award = "一軍完整球季"
         else:
             award = "球季完成"
+    active = career.active_game
+    last_pa = next(
+        (
+            event
+            for event in reversed(career.events)
+            if isinstance(event, PlateAppearancePlayedEvent)
+            and event.career_plate_appearance
+        ),
+        None,
+    )
+    active_view = None
+    if active is not None:
+        game = active.game_state
+        player = profile.player_id
+        active_view = CareerV4ActiveGame(
+            inning=game.inning,
+            half=game.half.value,
+            outs=game.outs,
+            bases=(
+                game.bases[0] is not None,
+                game.bases[1] is not None,
+                game.bases[2] is not None,
+            ),
+            away_score=game.away_score,
+            home_score=game.home_score,
+            player_on_base=next(
+                (index for index, runner in enumerate(game.bases, 1) if runner == player),
+                None,
+            ),
+            last_outcome=None if last_pa is None else last_pa.outcome.value,
+            season_game_number=active.game_number,
+        )
     return CareerV4Dashboard(
         career_id=record.career_id,
         revision=record.revision,
@@ -152,6 +203,7 @@ def _dashboard(record: CareerV4Record) -> CareerV4Dashboard:
             }
             else None
         ),
+        active_game=active_view,
     )
 
 
@@ -242,6 +294,52 @@ def career_v4_router(
                 request_payload=request.model_dump(mode="json"),
                 operation=advance_one_day,
             )
+        )
+
+    @router.post("/{career_id}/play-game", response_model=CareerV4Dashboard)
+    def play_game_endpoint(
+        career_id: str, request: AdvanceCareerDayRequest
+    ) -> CareerV4Dashboard:
+        return _mutate_simple(
+            career_id, request, "play-game", start_interactive_game
+        )
+
+    @router.post("/{career_id}/resolve-pa", response_model=CareerV4Dashboard)
+    def resolve_pa_endpoint(
+        career_id: str, request: ResolveCareerPARequest
+    ) -> CareerV4Dashboard:
+        return _dashboard(
+            repository.mutate(
+                career_id=career_id,
+                operation_id=request.operation_id,
+                action="resolve-pa",
+                expected_revision=request.expected_revision,
+                request_payload=request.model_dump(mode="json"),
+                operation=lambda aggregate: resolve_interactive_pa(
+                    aggregate,
+                    approach=BattingApproach(request.approach),
+                    baserunning=BaserunningStrategy(request.baserunning),
+                ),
+            )
+        )
+
+    @router.post("/{career_id}/simulate-game", response_model=CareerV4Dashboard)
+    def simulate_game_endpoint(
+        career_id: str, request: AdvanceCareerDayRequest
+    ) -> CareerV4Dashboard:
+        return _mutate_simple(
+            career_id, request, "simulate-game", simulate_interactive_game
+        )
+
+    @router.post("/{career_id}/acknowledge-game", response_model=CareerV4Dashboard)
+    def acknowledge_game_endpoint(
+        career_id: str, request: AdvanceCareerDayRequest
+    ) -> CareerV4Dashboard:
+        return _mutate_simple(
+            career_id,
+            request,
+            "acknowledge-game",
+            acknowledge_interactive_game,
         )
 
     def _mutate_simple(

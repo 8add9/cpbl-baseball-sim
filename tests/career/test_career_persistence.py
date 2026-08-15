@@ -106,6 +106,38 @@ def test_partial_plate_appearance_round_trip_is_exact(tmp_path) -> None:
     assert replay_career(origin, loaded.events) == loaded
 
 
+def test_pre_baserunning_schema3_payload_loads_with_zero_extended_stats(tmp_path) -> None:
+    repository = AtomicJsonCareerRepository(tmp_path)
+    origin = create_career(
+        player_id="legacy-runner",
+        name="Legacy Runner",
+        position="CF",
+        bats=Handedness.LEFT,
+        throws=Handedness.RIGHT,
+        archetype=BatterArchetype.SPEED,
+        age=18,
+        season_year=2026,
+        seed=44,
+        season_games=12,
+    )
+    path = repository.save("legacy", next_pa(origin))
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    extended = {"runs", "rbi", "stolen_bases", "caught_stealing"}
+    for stats_name in ("season_stats", "career_stats"):
+        for field in extended:
+            payload["state"][stats_name].pop(field)
+    active = payload["state"]["active_game"]
+    for field in ("career_runs", "career_rbi", "stolen_bases", "caught_stealing"):
+        active.pop(field)
+    for event in payload["state"]["events"]:
+        event.pop("approach", None)
+        event.pop("extra_base_advanced", None)
+    path.write_text(json.dumps(payload), encoding="utf-8")
+    loaded = repository.load("legacy")
+    assert loaded.season_stats.runs == 0
+    assert loaded.season_stats.stolen_bases == 0
+
+
 def test_load_rejects_materialized_state_that_disagrees_with_events(tmp_path) -> None:
     repository = AtomicJsonCareerRepository(tmp_path)
     path = repository.save("slot", _progressed())

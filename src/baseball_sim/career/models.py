@@ -160,6 +160,10 @@ class BattingStats:
     hbp: int = 0
     strikeouts: int = 0
     total_bases: int = 0
+    runs: int = 0
+    rbi: int = 0
+    stolen_bases: int = 0
+    caught_stealing: int = 0
 
     def __post_init__(self) -> None:
         values = (
@@ -175,6 +179,10 @@ class BattingStats:
             self.hbp,
             self.strikeouts,
             self.total_bases,
+            self.runs,
+            self.rbi,
+            self.stolen_bases,
+            self.caught_stealing,
         )
         if any(value < 0 for value in values):
             raise ValueError("batting statistics cannot be negative")
@@ -276,6 +284,10 @@ class ActiveCareerGame:
     game_number: int
     game_state: GameState
     career_outcomes: tuple[Outcome, ...]
+    career_runs: int = 0
+    career_rbi: int = 0
+    stolen_bases: int = 0
+    caught_stealing: int = 0
 
     def __post_init__(self) -> None:
         if len(self.career_outcomes) > self.game_state.plate_appearances:
@@ -293,7 +305,28 @@ class PlateAppearancePlayedEvent:
     career_plate_appearance: bool
     development_points_earned: int
     development_points_expired: int
+    approach: str = "normal"
+    extra_base_advanced: bool = False
     kind: str = "plate_appearance_played"
+
+
+@dataclass(frozen=True, slots=True)
+class CareerGameStartedEvent:
+    season_year: int
+    game_number: int
+    kind: str = "career_game_started"
+
+
+@dataclass(frozen=True, slots=True)
+class BaserunningPlayedEvent:
+    season_year: int
+    game_number: int
+    pa_index: int
+    runner: str
+    from_base: int
+    to_base: int
+    success: bool
+    kind: str = "baserunning_played"
 
 
 @dataclass(frozen=True, slots=True)
@@ -304,6 +337,11 @@ class GamePlayedEvent:
     outcomes: tuple[Outcome, ...]
     xp_earned: int
     development_points_earned: int
+    runs: int = 0
+    rbi: int = 0
+    stolen_bases: int = 0
+    caught_stealing: int = 0
+    extended_stats_recorded: bool = False
     kind: str = "game_played"
 
 
@@ -333,7 +371,9 @@ class CareerRetiredEvent:
 
 
 CareerEvent: TypeAlias = (
-    PlateAppearancePlayedEvent
+    CareerGameStartedEvent
+    | PlateAppearancePlayedEvent
+    | BaserunningPlayedEvent
     | GamePlayedEvent
     | RatingImprovedEvent
     | SeasonAdvancedEvent

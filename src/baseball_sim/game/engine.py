@@ -19,37 +19,48 @@ class Transition:
     runs_scored: int
     inning_ended: bool
     walk_off: bool
+    scoring_runners: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class BaserunningTransition:
+    state: GameState
+    runner: str
+    from_base: int
+    to_base: int
+    success: bool
+    inning_ended: bool
 
 
 def _advance_walk(
     bases: tuple[str | None, str | None, str | None], batter: str
-) -> tuple[tuple[str | None, str | None, str | None], int]:
+) -> tuple[tuple[str | None, str | None, str | None], tuple[str, ...]]:
     first, second, third = bases
-    runs = 0
+    scoring: tuple[str, ...] = ()
     if first is not None:
         if second is not None:
             if third is not None:
-                runs = 1
+                scoring = (third,)
             third = second
         second = first
     first = batter
-    return (first, second, third), runs
+    return (first, second, third), scoring
 
 
 def _advance_hit(
     bases: tuple[str | None, str | None, str | None], batter: str, bases_awarded: int
-) -> tuple[tuple[str | None, str | None, str | None], int]:
+) -> tuple[tuple[str | None, str | None, str | None], tuple[str, ...]]:
     runners = [(index + 1, runner) for index, runner in enumerate(bases) if runner is not None]
-    runs = sum(1 for base, _runner in runners if base + bases_awarded >= 4)
+    scoring = tuple(runner for base, runner in runners if base + bases_awarded >= 4)
     if bases_awarded == 4:
-        return (None, None, None), runs + 1
+        return (None, None, None), scoring + (batter,)
     advanced: list[str | None] = [None, None, None]
     for base, runner in runners:
         destination = base + bases_awarded
         if destination < 4:
             advanced[destination - 1] = runner
     advanced[bases_awarded - 1] = batter
-    return (advanced[0], advanced[1], advanced[2]), runs
+    return (advanced[0], advanced[1], advanced[2]), scoring
 
 
 def _score(state: GameState, runs: int) -> GameState:
@@ -101,6 +112,7 @@ def apply_outcome(state: GameState, outcome: Outcome) -> Transition:
     pitcher = state.pitcher
     before_half = (state.inning, state.half)
     runs = 0
+    scoring_runners: tuple[str, ...] = ()
     third_out = False
 
     if outcome in (Outcome.SO, Outcome.OUT):
@@ -108,7 +120,8 @@ def apply_outcome(state: GameState, outcome: Outcome) -> Transition:
         if not third_out:
             state = replace(state, outs=state.outs + 1)
     elif outcome in (Outcome.BB, Outcome.HBP):
-        bases, runs = _advance_walk(state.bases, batter)
+        bases, scoring_runners = _advance_walk(state.bases, batter)
+        runs = len(scoring_runners)
         state = replace(state, bases=bases)
     else:
         bases_awarded = {
@@ -117,7 +130,8 @@ def apply_outcome(state: GameState, outcome: Outcome) -> Transition:
             Outcome.TRIPLE: 3,
             Outcome.HR: 4,
         }[outcome]
-        bases, runs = _advance_hit(state.bases, batter, bases_awarded)
+        bases, scoring_runners = _advance_hit(state.bases, batter, bases_awarded)
+        runs = len(scoring_runners)
         state = replace(state, bases=bases)
 
     if (
@@ -129,6 +143,7 @@ def apply_outcome(state: GameState, outcome: Outcome) -> Transition:
         runs_needed = state.away_score - state.home_score + 1
         if 0 < runs_needed <= runs:
             runs = runs_needed
+            scoring_runners = scoring_runners[:runs]
     state = _next_batter(_score(state, runs))
     walk_off = (
         state.half is HalfInning.BOTTOM
@@ -140,7 +155,55 @@ def apply_outcome(state: GameState, outcome: Outcome) -> Transition:
     elif third_out:
         state = _end_half(state)
     inning_ended = before_half != (state.inning, state.half) or state.finished
-    return Transition(state, outcome, batter, pitcher, runs, inning_ended, walk_off)
+    return Transition(
+        state,
+        outcome,
+        batter,
+        pitcher,
+        runs,
+        inning_ended,
+        walk_off,
+        scoring_runners,
+    )
+
+
+def apply_steal(
+    state: GameState, runner: str, from_base: int, *, success: bool
+) -> BaserunningTransition:
+    """Apply a steal without consuming a plate appearance.
+
+    This is deliberately separate from the PA sampler so baserunning draws cannot
+    shift the deterministic PA outcome stream.
+    """
+    if state.finished:
+        raise ValueError("cannot run in a finished game")
+    if from_base not in (1, 2):
+        raise ValueError("steals are supported only from first or second base")
+    bases = list(state.bases)
+    if bases[from_base - 1] != runner:
+        raise ValueError("runner is not on the requested base")
+    if bases[from_base] is not None:
+        raise ValueError("the destination base is occupied")
+    before_half = (state.inning, state.half)
+    bases[from_base - 1] = None
+    if success:
+        bases[from_base] = runner
+        state = replace(state, bases=(bases[0], bases[1], bases[2]))
+    elif state.outs == 2:
+        state = _end_half(replace(state, bases=(bases[0], bases[1], bases[2])))
+    else:
+        state = replace(
+            state, bases=(bases[0], bases[1], bases[2]), outs=state.outs + 1
+        )
+    inning_ended = before_half != (state.inning, state.half) or state.finished
+    return BaserunningTransition(
+        state=state,
+        runner=runner,
+        from_base=from_base,
+        to_base=from_base + 1,
+        success=success,
+        inning_ended=inning_ended,
+    )
 
 
 def replay(initial: GameState, outcomes: Iterable[Outcome]) -> GameState:

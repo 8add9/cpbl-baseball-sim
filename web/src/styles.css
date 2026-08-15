@@ -260,3 +260,15 @@ button:focus-visible { outline: 2px solid var(--amber); outline-offset: 3px; }
   .manager-tabs { grid-template-columns: repeat(2,1fr); }
   .manager-command { grid-template-columns: repeat(2,1fr); }
 }
+
+.career-at-bat { grid-column: 1 / -1; }
+.career-game-score { display: flex; align-items: center; gap: 14px; margin: 12px 0; font-size: 2rem; }
+.career-base-state { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 10px 0 18px; }
+.career-base-state span { padding: 6px 9px; border: 1px solid var(--line); border-radius: 6px; color: var(--muted); }
+.career-base-state span.occupied { border-color: var(--amber); background: var(--amber); color: #17130b; font-weight: 800; }
+.career-at-bat label { display: grid; gap: 7px; max-width: 420px; margin-bottom: 16px; }
+.approach-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 10px; margin: 14px 0; }
+.approach-grid button { min-height: 76px; display: grid; gap: 4px; text-align: left; }
+.approach-grid small { color: var(--muted); font-weight: 400; }
+@media (max-width: 760px) { .approach-grid { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 460px) { .approach-grid { grid-template-columns: 1fr; } }

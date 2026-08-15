@@ -224,3 +224,13 @@
   for the single backend worker used in Phase 1; multi-worker coordination remains a
   future deployment concern.
 - **Date:** 2026-08-12
+
+## ADR-021 — Career baserunning is a separate deterministic event channel
+
+- **Decision:** Career steals use an explicit non-PA transition and a counter-based
+  `career-baserunning-v0.1` draw channel. SpeedProxy and the selected conservative,
+  balanced, or aggressive tendency control attempts, success, and created-runner
+  extra-base advancement. R/RBI/SB/CS are stored as replayable counting statistics.
+- **Why:** A steal must not consume a PA or shift the accepted PA outcome stream.
+- **Consequences:** This is a created-player runner model, not a claim of complete
+  league-wide baserunning or measured sprint speed.

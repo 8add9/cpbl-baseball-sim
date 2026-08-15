@@ -15,11 +15,13 @@ from baseball_sim.simulation.outcomes import Outcome
 from .models import (
     CAREER_SCHEMA_VERSION,
     ActiveCareerGame,
+    BaserunningPlayedEvent,
     BatterArchetype,
     BatterSkill,
     BatterSkillScores,
     BattingStats,
     CareerEvent,
+    CareerGameStartedEvent,
     CareerOrigin,
     CareerRetiredEvent,
     CareerState,
@@ -60,6 +62,12 @@ def _stats(value: BattingStats) -> dict[str, int]:
 
 
 def _event(value: CareerEvent) -> dict[str, object]:
+    if isinstance(value, CareerGameStartedEvent):
+        return {
+            "kind": value.kind,
+            "season_year": value.season_year,
+            "game_number": value.game_number,
+        }
     if isinstance(value, PlateAppearancePlayedEvent):
         return {
             "kind": value.kind,
@@ -72,6 +80,19 @@ def _event(value: CareerEvent) -> dict[str, object]:
             "career_plate_appearance": value.career_plate_appearance,
             "development_points_earned": value.development_points_earned,
             "development_points_expired": value.development_points_expired,
+            "approach": value.approach,
+            "extra_base_advanced": value.extra_base_advanced,
+        }
+    if isinstance(value, BaserunningPlayedEvent):
+        return {
+            "kind": value.kind,
+            "season_year": value.season_year,
+            "game_number": value.game_number,
+            "pa_index": value.pa_index,
+            "runner": value.runner,
+            "from_base": value.from_base,
+            "to_base": value.to_base,
+            "success": value.success,
         }
     if isinstance(value, GamePlayedEvent):
         return {
@@ -82,6 +103,11 @@ def _event(value: CareerEvent) -> dict[str, object]:
             "outcomes": [outcome.value for outcome in value.outcomes],
             "xp_earned": value.xp_earned,
             "development_points_earned": value.development_points_earned,
+            "runs": value.runs,
+            "rbi": value.rbi,
+            "stolen_bases": value.stolen_bases,
+            "caught_stealing": value.caught_stealing,
+            "extended_stats_recorded": value.extended_stats_recorded,
         }
     if isinstance(value, RatingImprovedEvent):
         return {
@@ -170,6 +196,10 @@ def career_to_dict(state: CareerState) -> dict[str, object]:
                 "career_outcomes": [
                     outcome.value for outcome in state.active_game.career_outcomes
                 ],
+                "career_runs": state.active_game.career_runs,
+                "career_rbi": state.active_game.career_rbi,
+                "stolen_bases": state.active_game.stolen_bases,
+                "caught_stealing": state.active_game.caught_stealing,
             },
             "season_stats": _stats(state.season_stats),
             "career_stats": _stats(state.career_stats),
@@ -205,7 +235,12 @@ def _load_scores(value: object) -> BatterSkillScores:
 
 def _load_stats(value: object) -> BattingStats:
     data = _as_dict(value, "stats")
-    return BattingStats(**{field: int(data[field]) for field in BattingStats.__dataclass_fields__})
+    return BattingStats(
+        **{
+            field: int(data.get(field, 0))
+            for field in BattingStats.__dataclass_fields__
+        }
+    )
 
 
 def _load_purchase_counters(value: object) -> tuple[int, int, int, int]:
@@ -217,6 +252,10 @@ def _load_purchase_counters(value: object) -> tuple[int, int, int, int]:
 def _load_event(value: object) -> CareerEvent:
     data = _as_dict(value, "event")
     kind = str(data["kind"])
+    if kind == "career_game_started":
+        return CareerGameStartedEvent(
+            int(data["season_year"]), int(data["game_number"])
+        )
     if kind == "plate_appearance_played":
         return PlateAppearancePlayedEvent(
             int(data["season_year"]),
@@ -228,6 +267,18 @@ def _load_event(value: object) -> CareerEvent:
             bool(data["career_plate_appearance"]),
             int(data["development_points_earned"]),
             int(data["development_points_expired"]),
+            str(data.get("approach", "normal")),
+            bool(data.get("extra_base_advanced", False)),
+        )
+    if kind == "baserunning_played":
+        return BaserunningPlayedEvent(
+            int(data["season_year"]),
+            int(data["game_number"]),
+            int(data["pa_index"]),
+            str(data["runner"]),
+            int(data["from_base"]),
+            int(data["to_base"]),
+            bool(data["success"]),
         )
     if kind == "game_played":
         outcomes = data["outcomes"]
@@ -240,6 +291,11 @@ def _load_event(value: object) -> CareerEvent:
             tuple(Outcome(str(outcome)) for outcome in outcomes),
             int(data["xp_earned"]),
             int(data["development_points_earned"]),
+            int(data.get("runs", 0)),
+            int(data.get("rbi", 0)),
+            int(data.get("stolen_bases", 0)),
+            int(data.get("caught_stealing", 0)),
+            bool(data.get("extended_stats_recorded", False)),
         )
     if kind == "rating_improved":
         return RatingImprovedEvent(
@@ -325,6 +381,10 @@ def career_from_dict(value: object) -> CareerState:
                 int(active_data["game_number"]),
                 _load_game_state(active_data["game_state"]),
                 tuple(Outcome(str(outcome)) for outcome in active_outcomes),
+                int(active_data.get("career_runs", 0)),
+                int(active_data.get("career_rbi", 0)),
+                int(active_data.get("stolen_bases", 0)),
+                int(active_data.get("caught_stealing", 0)),
             )
         records_raw = data["completed_seasons"]
         events_raw = data["events"]

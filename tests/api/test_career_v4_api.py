@@ -144,3 +144,50 @@ def test_two_complete_seasons_require_the_full_offseason_flow(tmp_path) -> None:
         )
         assert restarted.status_code == 200
         assert restarted.json() == career
+
+
+def test_interactive_game_accepts_pa_strategy_and_persists_extended_stats(tmp_path) -> None:
+    database = tmp_path / "interactive.sqlite3"
+    client = _app(database)
+    career = client.post("/api/careers-v4", json=_create_payload("interactive-create")).json()
+    career_id = career["career_id"]
+    career = client.post(
+        f"/api/careers-v4/{career_id}/plan-week",
+        json={
+            "expected_revision": career["revision"],
+            "operation_id": "interactive-plan",
+            "actions": [],
+        },
+    ).json()
+    while not career["calendar_days"][career["weekday"] - 1]["is_game_day"]:
+        career = client.post(
+            f"/api/careers-v4/{career_id}/advance-day",
+            json={
+                "expected_revision": career["revision"],
+                "operation_id": f"skip-{career['weekday']}",
+            },
+        ).json()
+    entered = client.post(
+        f"/api/careers-v4/{career_id}/play-game",
+        json={"expected_revision": career["revision"], "operation_id": "enter-game"},
+    )
+    assert entered.status_code == 200
+    career = entered.json()
+    assert career["phase"] == "player_pa"
+    assert career["active_game"] is not None
+    resolved = client.post(
+        f"/api/careers-v4/{career_id}/resolve-pa",
+        json={
+            "expected_revision": career["revision"],
+            "operation_id": "selected-pa",
+            "approach": "power_swing",
+            "baserunning": "aggressive",
+        },
+    )
+    assert resolved.status_code == 200
+    career = resolved.json()
+    assert career["phase"] in {"player_pa", "post_game"}
+    assert career["season_stats"]["stolen_bases"] >= 0
+    assert career["season_stats"]["caught_stealing"] >= 0
+    restarted = _app(database).get(f"/api/careers-v4/{career_id}/dashboard")
+    assert restarted.json() == career

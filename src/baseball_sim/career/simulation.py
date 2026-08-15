@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 from dataclasses import replace
+from enum import StrEnum
 from functools import lru_cache
 
-from baseball_sim.game.engine import apply_outcome
+from baseball_sim.game.engine import Transition, apply_outcome, apply_steal
 from baseball_sim.game.simulation import counter_uniform
 from baseball_sim.game.state import GameState
 from baseball_sim.simulation.matchup import (
@@ -15,11 +16,19 @@ from baseball_sim.simulation.matchup import (
 )
 from baseball_sim.simulation.outcomes import Outcome
 
+from .approach import (
+    NEUTRAL_CONTEXT,
+    BattingApproach,
+    CareerBattingContext,
+    career_matchup_probabilities,
+)
 from .models import (
     ActiveCareerGame,
+    BaserunningPlayedEvent,
     BatterSkillScores,
     BattingStats,
     CareerEvent,
+    CareerGameStartedEvent,
     CareerRetiredEvent,
     CareerState,
     GamePlayedEvent,
@@ -33,6 +42,13 @@ from .progression import DEVELOPMENT_BANK_CAP, spend_development_points
 
 DEFAULT_PLATE_APPEARANCES = 4  # Retained as a compatibility-only request field.
 CAREER_GAME_FIXTURE_VERSION = "career-neutral-game-v0.1"
+BASERUNNING_MODEL_VERSION = "career-baserunning-v0.1"
+
+
+class BaserunningStrategy(StrEnum):
+    CONSERVATIVE = "conservative"
+    BALANCED = "balanced"
+    AGGRESSIVE = "aggressive"
 
 
 def _new_game(state: CareerState) -> ActiveCareerGame:
@@ -52,6 +68,23 @@ def _new_game(state: CareerState) -> ActiveCareerGame:
         rating_snapshot_version=CAREER_GAME_FIXTURE_VERSION,
     )
     return ActiveCareerGame(state.season_year, state.games_played + 1, game, ())
+
+
+def _apply_game_started_event(
+    state: CareerState, event: CareerGameStartedEvent
+) -> CareerState:
+    if state.active_game is not None:
+        raise ValueError("a career game is already active")
+    if (
+        event.season_year != state.season_year
+        or event.game_number != state.games_played + 1
+    ):
+        raise ValueError("game-start event does not match the schedule")
+    return replace(
+        state,
+        active_game=_new_game(state),
+        events=state.events + (event,),
+    )
 
 
 def _cards(
@@ -87,6 +120,101 @@ def _sample(probabilities: tuple[float, ...], draw: float) -> Outcome:
     return Outcome.HR
 
 
+def _runner_base(game: GameState, runner: str) -> int | None:
+    for index, occupant in enumerate(game.bases, start=1):
+        if occupant == runner:
+            return index
+    return None
+
+
+def _steal_rates(
+    speed_rating: float, strategy: BaserunningStrategy, from_base: int
+) -> tuple[float, float]:
+    attempt_base = {
+        BaserunningStrategy.CONSERVATIVE: 0.025,
+        BaserunningStrategy.BALANCED: 0.09,
+        BaserunningStrategy.AGGRESSIVE: 0.20,
+    }[strategy]
+    speed_factor = max(0.35, min(1.65, 0.65 + (speed_rating - 50.0) / 55.0))
+    attempt = attempt_base * speed_factor * (0.72 if from_base == 2 else 1.0)
+    success = 0.54 + 0.0042 * (speed_rating - 50.0) + (0.04 if from_base == 2 else 0)
+    return min(0.38, attempt), max(0.50, min(0.88, success))
+
+
+def _apply_extra_base(
+    transition: Transition, player: str, *, advanced: bool
+) -> Transition:
+    """Give the created runner one documented extra base after a teammate hit."""
+    if not advanced:
+        return transition
+    state = transition.state
+    current_base = _runner_base(state, player)
+    if current_base is None:
+        raise ValueError("extra-base event requires the runner to remain on base")
+    bases = list(state.bases)
+    bases[current_base - 1] = None
+    scoring = transition.scoring_runners
+    runs = transition.runs_scored
+    if current_base == 3:
+        if state.batting_team.value != "away":
+            raise ValueError("career runner is expected on the away team")
+        state = replace(
+            state,
+            bases=(bases[0], bases[1], bases[2]),
+            away_score=state.away_score + 1,
+        )
+        scoring += (player,)
+        runs += 1
+    else:
+        if bases[current_base] is not None:
+            raise ValueError("extra-base destination is occupied")
+        bases[current_base] = player
+        state = replace(state, bases=(bases[0], bases[1], bases[2]))
+    return replace(
+        transition,
+        state=state,
+        runs_scored=runs,
+        scoring_runners=scoring,
+    )
+
+
+def _extra_base_candidate(
+    before: GameState, transition: Transition, player: str
+) -> bool:
+    if transition.batter == player or transition.outcome not in {
+        Outcome.SINGLE,
+        Outcome.DOUBLE,
+    }:
+        return False
+    before_base = _runner_base(before, player)
+    after_base = _runner_base(transition.state, player)
+    if before_base is None or after_base is None:
+        return False
+    if after_base < 3 and transition.state.bases[after_base] is not None:
+        return False
+    if transition.outcome is Outcome.SINGLE:
+        return (before_base, after_base) in {(1, 2), (2, 3)}
+    return (before_base, after_base) == (1, 3)
+
+
+def _extra_base_success(
+    game: GameState, speed_rating: float, strategy: BaserunningStrategy
+) -> bool:
+    base = {
+        BaserunningStrategy.CONSERVATIVE: 0.18,
+        BaserunningStrategy.BALANCED: 0.38,
+        BaserunningStrategy.AGGRESSIVE: 0.58,
+    }[strategy]
+    probability = max(0.08, min(0.82, base + (speed_rating - 65.0) * 0.006))
+    draw = counter_uniform(
+        game.seed,
+        game.plate_appearances,
+        "career-extra-base",
+        BASERUNNING_MODEL_VERSION,
+    )
+    return draw < probability
+
+
 def _game_rewards(stats: BattingStats) -> tuple[int, int]:
     # Participation, not performance, drives development. This avoids a rich-get-richer
     # loop where better ratings earn more points simply because they create more hits.
@@ -109,6 +237,14 @@ def _apply_game_event(state: CareerState, event: GamePlayedEvent) -> CareerState
     if event.plate_appearances != len(event.outcomes) or event.plate_appearances <= 0:
         raise ValueError("game event plate appearances are invalid")
     game_stats = BattingStats.from_outcomes(event.outcomes)
+    if event.extended_stats_recorded:
+        game_stats = replace(
+            game_stats,
+            runs=event.runs,
+            rbi=event.rbi,
+            stolen_bases=event.stolen_bases,
+            caught_stealing=event.caught_stealing,
+        )
     expected_xp, _unused = _game_rewards(game_stats)
     if event.xp_earned != expected_xp:
         raise ValueError("game event XP does not match its outcomes")
@@ -121,6 +257,13 @@ def _apply_game_event(state: CareerState, event: GamePlayedEvent) -> CareerState
     )
     if event.development_points_earned != awarded:
         raise ValueError("game event development points do not match XP thresholds")
+    if event.extended_stats_recorded and (
+        event.runs != active.career_runs
+        or event.rbi != active.career_rbi
+        or event.stolen_bases != active.stolen_bases
+        or event.caught_stealing != active.caught_stealing
+    ):
+        raise ValueError("game event baserunning totals do not match the active game")
     return replace(
         state,
         games_played=state.games_played + 1,
@@ -153,6 +296,16 @@ def _apply_pa_event(state: CareerState, event: PlateAppearancePlayedEvent) -> Ca
     ):
         raise ValueError("plate-appearance participants do not match the M3 game")
     transition = apply_outcome(active.game_state, event.outcome)
+    candidate = _extra_base_candidate(
+        active.game_state, transition, state.origin.profile.player_id
+    )
+    if event.extra_base_advanced and not candidate:
+        raise ValueError("extra-base event is not legal for this plate appearance")
+    transition = _apply_extra_base(
+        transition,
+        state.origin.profile.player_id,
+        advanced=event.extra_base_advanced,
+    )
     xp_increment = int(event.career_plate_appearance)
     crossed = (
         (state.experience + xp_increment) // 60 - state.experience // 60
@@ -170,6 +323,25 @@ def _apply_pa_event(state: CareerState, event: PlateAppearancePlayedEvent) -> Ca
         transition.state,
         active.career_outcomes
         + ((event.outcome,) if event.career_plate_appearance else ()),
+        active.career_runs
+        + int(state.origin.profile.player_id in transition.scoring_runners),
+        active.career_rbi
+        + (
+            transition.runs_scored
+            if event.career_plate_appearance
+            and event.outcome
+            in {
+                Outcome.BB,
+                Outcome.HBP,
+                Outcome.SINGLE,
+                Outcome.DOUBLE,
+                Outcome.TRIPLE,
+                Outcome.HR,
+            }
+            else 0
+        ),
+        active.stolen_bases,
+        active.caught_stealing,
     )
     return replace(
         state,
@@ -181,11 +353,84 @@ def _apply_pa_event(state: CareerState, event: PlateAppearancePlayedEvent) -> Ca
     )
 
 
+def _apply_baserunning_event(
+    state: CareerState, event: BaserunningPlayedEvent
+) -> CareerState:
+    active = state.active_game
+    if active is None:
+        raise ValueError("baserunning requires an active game")
+    player = state.origin.profile.player_id
+    if (
+        event.season_year != state.season_year
+        or event.game_number != active.game_number
+        or event.pa_index != active.game_state.plate_appearances
+        or event.runner != player
+        or event.to_base != event.from_base + 1
+    ):
+        raise ValueError("baserunning event does not match the active game")
+    transition = apply_steal(
+        active.game_state,
+        event.runner,
+        event.from_base,
+        success=event.success,
+    )
+    updated = replace(
+        active,
+        game_state=transition.state,
+        stolen_bases=active.stolen_bases + int(event.success),
+        caught_stealing=active.caught_stealing + int(not event.success),
+    )
+    return replace(state, active_game=updated, events=state.events + (event,))
+
+
+def _maybe_attempt_steal(
+    state: CareerState, strategy: BaserunningStrategy
+) -> CareerState:
+    active = state.active_game
+    if active is None or active.game_state.finished:
+        return state
+    game = active.game_state
+    player = state.origin.profile.player_id
+    from_base = _runner_base(game, player)
+    if from_base not in (1, 2) or game.bases[from_base] is not None:
+        return state
+    attempt_rate, success_rate = _steal_rates(
+        state.ratings.speed_proxy, strategy, from_base
+    )
+    attempt_draw = counter_uniform(
+        game.seed,
+        game.plate_appearances,
+        f"career-steal-attempt-{from_base}",
+        BASERUNNING_MODEL_VERSION,
+    )
+    if attempt_draw >= attempt_rate:
+        return state
+    success_draw = counter_uniform(
+        game.seed,
+        game.plate_appearances,
+        f"career-steal-success-{from_base}",
+        BASERUNNING_MODEL_VERSION,
+    )
+    return _apply_baserunning_event(
+        state,
+        BaserunningPlayedEvent(
+            season_year=state.season_year,
+            game_number=active.game_number,
+            pa_index=game.plate_appearances,
+            runner=player,
+            from_base=from_base,
+            to_base=from_base + 1,
+            success=success_draw < success_rate,
+        ),
+    )
 def _next_game_pa(
     state: CareerState,
     *,
     plate_appearances: int = DEFAULT_PLATE_APPEARANCES,
     opponent: PitcherRatings | None = None,
+    approach: BattingApproach = BattingApproach.NORMAL,
+    context: CareerBattingContext = NEUTRAL_CONTEXT,
+    baserunning: BaserunningStrategy = BaserunningStrategy.BALANCED,
 ) -> CareerState:
     """Play one internal M3 PA and autosettle when that game finishes."""
     if not 1 <= plate_appearances <= 12:
@@ -194,17 +439,27 @@ def _next_game_pa(
         raise ValueError("the career is retired")
     if state.games_played >= state.origin.season_games:
         raise ValueError("the current season schedule is complete")
+    state = _maybe_attempt_steal(state, baserunning)
     active = state.active_game or _new_game(state)
     batters, pitchers = _cards(state, active)
     if opponent is not None:
         pitchers[active.game_state.home_pitcher] = opponent
     game_number = state.games_played + 1
     game = active.game_state
-    probabilities = _probability_values(batters[game.batter], pitchers[game.pitcher])
+    is_career_batter = game.batter == state.origin.profile.player_id
+    if is_career_batter:
+        probabilities = career_matchup_probabilities(
+            batters[game.batter], pitchers[game.pitcher], approach, context
+        ).values
+    else:
+        probabilities = _probability_values(batters[game.batter], pitchers[game.pitcher])
     draw = counter_uniform(
         game.seed, game.plate_appearances, "pa-outcome", game.simulation_model_version
     )
     transition = apply_outcome(game, _sample(probabilities, draw))
+    extra_base = _extra_base_candidate(
+        game, transition, state.origin.profile.player_id
+    ) and _extra_base_success(game, state.ratings.speed_proxy, baserunning)
     is_career_pa = transition.batter == state.origin.profile.player_id
     xp_increment = int(is_career_pa)
     crossed = (
@@ -223,6 +478,8 @@ def _next_game_pa(
             is_career_pa,
             awarded,
             crossed - awarded,
+            approach.value if is_career_pa else BattingApproach.NORMAL.value,
+            extra_base,
         ),
     )
     completed = state.active_game
@@ -244,6 +501,11 @@ def _next_game_pa(
         outcomes=completed.career_outcomes,
         xp_earned=xp,
         development_points_earned=points,
+        runs=completed.career_runs,
+        rbi=completed.career_rbi,
+        stolen_bases=completed.stolen_bases,
+        caught_stealing=completed.caught_stealing,
+        extended_stats_recorded=True,
     )
     return _apply_game_event(state, event)
 
@@ -265,6 +527,53 @@ def next_pa(
         if result.experience > starting_xp or result.games_played > starting_games:
             return result
     raise RuntimeError("career game exceeded the plate-appearance safety limit")
+
+
+def prepare_player_pa(
+    state: CareerState,
+    *,
+    baserunning: BaserunningStrategy = BaserunningStrategy.BALANCED,
+) -> CareerState:
+    """Start/resume a game and stop before the created player's next PA."""
+    if state.retired:
+        raise ValueError("the career is retired")
+    result = state
+    if result.active_game is None:
+        result = _apply_game_started_event(
+            result,
+            CareerGameStartedEvent(result.season_year, result.games_played + 1),
+        )
+    player = result.origin.profile.player_id
+    for _ in range(1_000):
+        active = result.active_game
+        if active is None or active.game_state.finished:
+            return result
+        if active.game_state.batter == player:
+            return result
+        result = _next_game_pa(result, baserunning=baserunning)
+    raise RuntimeError("career game exceeded the plate-appearance safety limit")
+
+
+def resolve_prepared_player_pa(
+    state: CareerState,
+    *,
+    approach: BattingApproach,
+    context: CareerBattingContext = NEUTRAL_CONTEXT,
+    baserunning: BaserunningStrategy = BaserunningStrategy.BALANCED,
+) -> CareerState:
+    """Resolve one selected PA, then stop at the next player PA or game end."""
+    active = state.active_game
+    if active is None or active.game_state.batter != state.origin.profile.player_id:
+        raise ValueError("the career player is not ready to bat")
+    result = _next_game_pa(
+        state,
+        approach=approach,
+        context=context,
+        baserunning=baserunning,
+    )
+    if result.active_game is None:
+        return result
+    return prepare_player_pa(result, baserunning=baserunning)
 
 
 def play_game(
@@ -438,8 +747,12 @@ def replay_career(origin_state: CareerState, events: tuple[CareerEvent, ...]) ->
         raise ValueError("replay requires an unmodified origin state")
     state = initial_state(origin_state.origin)
     for event in events:
-        if isinstance(event, PlateAppearancePlayedEvent):
+        if isinstance(event, CareerGameStartedEvent):
+            state = _apply_game_started_event(state, event)
+        elif isinstance(event, PlateAppearancePlayedEvent):
             state = _apply_pa_event(state, event)
+        elif isinstance(event, BaserunningPlayedEvent):
+            state = _apply_baserunning_event(state, event)
         elif isinstance(event, GamePlayedEvent):
             state = _apply_game_event(state, event)
         elif isinstance(event, RatingImprovedEvent):
