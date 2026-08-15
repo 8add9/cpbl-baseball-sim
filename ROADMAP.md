@@ -94,13 +94,15 @@ Evidence:
 
 ## M5 — Career Mode 1-1
 
-**Status:** In Progress — v0.4 weekly-development replacement (2026-08-12)
+**Status:** Complete for Phase 1 text product (2026-08-15)
 
 The former create-player + Next-PA loop is migration code and no longer satisfies
 acceptance. Completed v0.4 slice: five archetypes, weekly AP, skill XP/diminishing
 returns, fatigue/recovery, formal UI concept, and shared-engine approach adapter.
-Remaining: persisted v4 aggregate/migration, calendar/status/playing time, events,
-season/offseason/contract, balance harness and two-season browser QA.
+The shipped v4 product loop is dashboard-first: weekly calendar/AP planning, skill XP,
+fatigue/recovery, four scheduled games per week, season/career statistics, quick week
+and season simulation, then mandatory season review, award, contract, offseason, and
+next-season phases. The former Next-PA-first screen is no longer exposed by the Web UI.
 
 Acceptance:
 
@@ -172,7 +174,7 @@ Current evidence:
 
 ## M7 — Phase 1 completion
 
-**Status:** In Progress — Career v0.4 browser acceptance remains (2026-08-12)
+**Status:** Complete for the requested Phase 1 text simulation scope (2026-08-15)
 
 Acceptance:
 
@@ -202,9 +204,9 @@ Evidence:
   half-inning simulation with no console warnings or errors. The SQL Server source
   container remained separate and unchanged.
 
-The Pages/ngrok path is operational. Ordinary Game, Career and Manager now have durable
-SQLite adapters; local restart-replay tests pass. Production restart evidence for the new
-Game adapter and Career v0.4 two-season browser acceptance remain required. Phase 2
+The Pages/ngrok path is operational. Career and Manager have durable SQLite adapters;
+local restart-replay and a two-complete-season Career API acceptance pass. The standalone
+ordinary text-game homepage was removed; Manager is now the default entry. Phase 2
 remains blocked regardless.
 
 ## Phase 2 — Operable batting prototype

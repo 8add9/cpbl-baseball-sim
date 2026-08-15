@@ -174,6 +174,11 @@ button:focus-visible { outline: 2px solid var(--amber); outline-offset: 3px; }
 
 .mode-link { min-height: 40px; padding: 0 14px; border: 1px solid var(--red); border-radius: 6px; background: #251018; color: #ffdce0; font-weight: 700; cursor: pointer; }
 .career-shell { min-height: 100vh; max-width: 1580px; margin: 0 auto; padding: 0 14px 24px; }
+.career-v4-hero { display: grid; grid-template-columns: minmax(260px,1fr) 130px 130px auto; gap: 1px; margin-top: 12px; overflow: hidden; border: 1px solid var(--line); border-radius: 8px; background: var(--line); }
+.career-v4-hero > * { min-width: 0; padding: 15px 18px; background: rgba(9,19,29,.98); }.career-v4-hero h1 { margin: 0 0 5px; }.career-v4-hero span,.career-v4-hero small { display: block; color: var(--muted); }.career-v4-hero strong { display: block; color: var(--amber); font-size: 27px; }
+.career-v4-hero > button { border: 0; color: white; background: #78121c; font-weight: 800; cursor: pointer; }.career-save-picker { width: 100%; min-height: 40px; margin-top: 8px; border: 1px solid var(--line); background: var(--ink-950); color: white; }
+.career-week-grid { grid-column: 1/-1; display: grid; grid-template-columns: repeat(7,1fr); gap: 6px; }.career-week-grid label { min-width: 0; min-height: 74px; display: grid; align-content: start; gap: 7px; padding: 9px; border: 1px solid var(--line); background: #0b1721; }.career-week-grid label.game-day { border-color: #a97a20; background: #201a0c; }.career-week-grid span { color: var(--muted); font-size: 11px; overflow-wrap: anywhere; }.career-week-grid select { width: 100%; min-width: 0; min-height: 32px; border: 1px solid #40515e; background: #07121b; color: white; }
+.career-offseason { grid-column: 1/-1; text-align: center; }.career-offseason .career-primary { min-width: 240px; padding: 0 25px; }
 .career-topbar { min-height: 66px; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; border-bottom: 1px solid var(--line); }
 .career-topbar > button { justify-self: start; border: 0; background: transparent; color: var(--muted); cursor: pointer; }
 .career-topbar > strong { font-size: 22px; letter-spacing: .04em; }.career-topbar > strong span { color: var(--red); }
@@ -234,6 +239,8 @@ button:focus-visible { outline: 2px solid var(--amber); outline-offset: 3px; }
   .manager-catalog { max-height: none; }.manager-command { grid-template-columns: repeat(3,1fr); }.manager-command > div { grid-column: 1/-1; }
 }
 @media (max-width: 699px) {
+  .career-v4-hero { grid-template-columns: 1fr 1fr; }.career-v4-hero > div:first-child { grid-column: 1/-1; }.career-v4-hero > button { min-height: 48px; }
+  .career-week-grid { grid-template-columns: 1fr; }.career-week-grid label { min-height: 52px; }
   .manager-shell { padding-inline: 7px; }.manager-topbar { grid-template-columns: auto 1fr; gap: 8px; }.manager-topbar > strong { font-size: 18px; }.manager-save { grid-column: 1/-1; padding-bottom: 9px; }
   .manager-summary { grid-template-columns: 120px 1fr; }.manager-summary > label { display: none; }.manager-summary strong { font-size: 23px; }.manager-summary .manager-next strong { font-size: 14px; white-space: normal; }
   .manager-tabs button { font-size: 13px; }.manager-budget { grid-template-columns: 1fr 72px 72px; }.manager-budget > div { padding: 0 9px; }

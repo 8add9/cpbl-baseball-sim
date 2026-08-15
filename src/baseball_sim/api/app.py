@@ -24,6 +24,13 @@ from baseball_sim.career import (
 from baseball_sim.career import (
     next_pa as play_next_career_pa,
 )
+from baseball_sim.career.persistence_v4 import (
+    CareerV4ConflictError,
+    CareerV4CorruptError,
+    CareerV4NotFoundError,
+    CareerV4ValidationError,
+    SqliteCareerV4Repository,
+)
 from baseball_sim.manager.cards import CatalogEntry
 from baseball_sim.manager.game_roster import LineupEntry
 from baseball_sim.manager.league_service import (
@@ -59,6 +66,7 @@ from .career_schemas import (
     SimulateWeekRequest,
     TrainCareerRequest,
 )
+from .career_v4_routes import career_v4_router
 from .career_views import career_view
 from .game_repository import GameWriteConflictError, SqliteGameRepository
 from .manager_repository import (
@@ -183,9 +191,11 @@ def create_app(
     repository: InMemoryGameRepository | None = None,
     career_repository: SqliteCareerRepository | None = None,
     manager_repository: SqliteManagerRepository | None = None,
+    career_v4_repository: SqliteCareerV4Repository | None = None,
 ) -> FastAPI:
     sessions = repository or SqliteGameRepository(_default_game_database())
     careers = career_repository or SqliteCareerRepository(_default_career_database())
+    careers_v4 = career_v4_repository or SqliteCareerV4Repository(_default_career_database())
     application = FastAPI(title="CPBL Baseball Simulator API", version="0.1.0")
     allowed_origins = [
         origin.strip()
@@ -204,7 +214,9 @@ def create_app(
     )
     application.state.game_repository = sessions
     application.state.career_repository = careers
+    application.state.career_v4_repository = careers_v4
     application.state.manager_repository = manager_repository
+    application.include_router(career_v4_router(careers_v4, careers))
 
     @application.get("/api/health")
     def health() -> dict[str, str]:
@@ -273,6 +285,36 @@ def create_app(
         return JSONResponse(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             content=body.model_dump(),
+        )
+
+    @application.exception_handler(CareerV4NotFoundError)
+    async def career_v4_not_found(
+        _request: Request, _error: CareerV4NotFoundError
+    ) -> JSONResponse:
+        body = ErrorResponse(code="career_v4_not_found", message="Career v4 save was not found.")
+        return JSONResponse(status_code=status.HTTP_404_NOT_FOUND, content=body.model_dump())
+
+    @application.exception_handler(CareerV4ConflictError)
+    async def career_v4_conflict(
+        _request: Request, error: CareerV4ConflictError
+    ) -> JSONResponse:
+        body = ErrorResponse(code="career_v4_conflict", message=str(error))
+        return JSONResponse(status_code=status.HTTP_409_CONFLICT, content=body.model_dump())
+
+    @application.exception_handler(CareerV4CorruptError)
+    async def career_v4_corrupt(
+        _request: Request, error: CareerV4CorruptError
+    ) -> JSONResponse:
+        body = ErrorResponse(code="career_v4_corrupt", message=str(error))
+        return JSONResponse(status_code=status.HTTP_409_CONFLICT, content=body.model_dump())
+
+    @application.exception_handler(CareerV4ValidationError)
+    async def career_v4_invalid(
+        _request: Request, error: CareerV4ValidationError
+    ) -> JSONResponse:
+        body = ErrorResponse(code="career_v4_invalid", message=str(error))
+        return JSONResponse(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, content=body.model_dump()
         )
 
     @application.exception_handler(ManagerNotFoundError)

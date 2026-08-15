@@ -99,7 +99,8 @@ function PlayerStats({ manager, scope }: { manager: ManagerView; scope: 'team' |
   </section>
 }
 
-export function ManagerMode({ onBack }: { onBack: () => void }) {
+export function ManagerMode({ onCareer, onBack }: { onCareer?: () => void; onBack?: () => void }) {
+  const openCareer = onCareer ?? onBack ?? (() => undefined)
   const [saves, setSaves] = useState<ManagerView[]>([])
   const [manager, setManager] = useState<ManagerView | null>(null)
   const [selectedTeamId, setSelectedTeamId] = useState('')
@@ -208,7 +209,7 @@ export function ManagerMode({ onBack }: { onBack: () => void }) {
 
   if (loading) return <main className="manager-shell"><div className="manager-empty"><strong>載入經理模式…</strong></div></main>
   if (!manager) return <main className="manager-shell">
-    <header className="manager-topbar"><button onClick={onBack}>返回比賽</button><strong><span>CPBL</span> 經理模式</strong></header>
+    <header className="manager-topbar"><button onClick={openCareer}>生涯模式</button><strong><span>CPBL</span> 經理模式</strong></header>
     <section className="manager-empty"><h1>建立你的六隊聯盟</h1><p>系統會以真實球員年度卡建立合法、互不重複的 22 人陣容。</p>
       {error ? <p className="manager-error" role="alert">{error}</p> : null}
       <button disabled={busy} onClick={createLeague}>{busy ? '建立中…' : '建立新聯盟'}</button></section>
@@ -222,7 +223,7 @@ export function ManagerMode({ onBack }: { onBack: () => void }) {
     ? selectedCard
     : team?.lineup[0] ?? null
   return <main className="manager-shell">
-    <header className="manager-topbar"><button onClick={onBack}>返回比賽</button>
+    <header className="manager-topbar"><button onClick={openCareer}>生涯模式</button>
       <strong><span>CPBL</span> 經理模式</strong>
       <div className="manager-save"><span>● 已儲存</span><small>rev {manager.revision} · seed {manager.seed}</small>
         <button disabled={busy} onClick={createLeague}>新增聯盟</button></div>

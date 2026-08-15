@@ -1,6 +1,6 @@
 # CPBL Baseball Sim 開發交接
 
-更新日期：2026-08-12
+更新日期：2026-08-15
 
 正式 repository：[8add9/cpbl-baseball-sim](https://github.com/8add9/cpbl-baseball-sim)
 
@@ -14,8 +14,8 @@
 | PA 機率模型 | 完成 v0.1 | 正式 hierarchical PA model；不以前端或第二套 RNG 抽結果 |
 | 九局文字比賽 | 完成 v0.1 | immutable GameState、逐 PA、半局／全場模擬、延長、再現性 |
 | Manager Mode | 完成現行 v0.1 範圍 | 陣容、棒次、輪值、真實隊名、120 場／隊、跨季、排名獎勵、球員數據、SQLite autosave |
-| Career v3 | 可運作舊版 | 建角、成長、完整比賽、SQLite save；不是新版產品規格的完成版 |
-| Career v4 | 本機 foundation、未正式上線 | 週曆、AP、疲勞、狀態、v4 aggregate/persistence/API 骨架；Web 與完整生涯循環仍待完成 |
+| Career v3 | migration-only | 舊 API 保留供既有邊界存檔轉入，Web 不再使用 |
+| Career v4 | 完成 Phase 1 文字產品範圍 | 週曆、AP、訓練 XP、疲勞、整週／整季、季末、獎項、合約、休季、下一季、SQLite autosave |
 | 全民打棒球／抽卡交易 | 未開始 | 依產品決策，Phase 1 完成後先暫停，不往此範圍擴張 |
 
 ## 2. 本次 Manager 球員數據功能
@@ -67,19 +67,21 @@ npm run build
 
 部署拓樸：GitHub Pages 靜態 React → HTTPS tunnel → Linux loopback FastAPI → SQLite volume／唯讀 rating artifacts。後端不得直接公開 bind 到公網。
 
-## 5. Career Mode 尚未完成
+## 5. Career Mode 現況
 
-新版 Career Mode 不能再以「一直按下一打席」作產品主循環。主要待辦：
+新版 Career Mode 已移除「一直按下一打席」主循環。目前入口是球員儀表板，
+每週安排非比賽日訓練或恢復，再選擇逐日、整週或整季模擬。完成 120 場後，
+必須依序通過球季總結、年度評價、合約、休季訓練，才能進入下一季。
 
-1. 把 Career v4 的週曆／AP／每日 action aggregate 正式接入 Web。
-2. 完成 training、recovery、fatigue、form、injury、trust、team status 與實際出場決策的單一 authoritative 流程。
-3. 將 Normal／Aggressive／Patient／Power／Contact／Situational approach 接入同一正式 PA engine，完成數值 Monte Carlo gates。
-4. 完成 regular season → season review → awards → contract → offseason training → next season 狀態機。
-5. 增加可信的聯盟 cohort，獎項必須由實際模擬統計排名產生，不能依 Rating 直接頒獎。
-6. 補 R／RBI 的可稽核 runner attribution；SB／CS 在 runner-event model 完成前不可假裝支援。
-7. 完成 v3 → v4 存檔 migration／封存策略與 production rollout。
-8. 完成至少兩個完整球季的 desktop＋mobile browser E2E、restart/reload exact replay。
-9. 執行 1,000 fictional players × 10 seasons balance validation；退休分布需另跑 lifespan cohort 至 45 歲。
+已驗證：建立 v4 存檔、安排週計畫、完整模擬兩個 120 場球季、五段休季流程、
+跨季生涯累計、每次 mutation revision/idempotency、SQLite 重啟後完全相同。
+
+後續研究項目（不阻擋 Phase 1 文字版交付）：
+
+1. Normal／Aggressive／Patient／Power／Contact／Situational 的逐打席選擇 UI。
+2. 更完整的傷病、球隊 depth、先發／板凳／代打出場決策與聯盟 cohort 獎項排名。
+3. R／RBI 逐跑者歸屬與 SB／CS runner-event model。
+4. 1,000 人 × 10 季長期平衡與 35–45 歲退休分布研究。
 
 ## 6. 已知限制與風險
 
@@ -90,23 +92,14 @@ npm run build
 - 2026 為進行中資料，只能展示／exhibition，不應進競技校準。
 - 公開使用 CPBL 衍生資料、姓名、隊名、商標與 Logo 仍需法務／授權審查。
 
-## 7. Working tree 與發布注意
+## 7. 首頁與發布
 
-本次 Manager 變更與交接文件可以獨立發布。工作目錄另有 Career v4 未提交檔案，不能誤混入 Manager commit：
-
-- `src/baseball_sim/api/app.py`
-- `src/baseball_sim/api/career_v4_routes.py`
-- `src/baseball_sim/api/career_v4_schemas.py`
-- `src/baseball_sim/career/aggregate_v4.py`
-- `src/baseball_sim/career/persistence_v4.py`
-- `tests/api/test_career_v4_api.py`
-- `tests/career/test_persistence_v4.py`
-
-發布 Manager 時必須精確 stage 指定檔案，禁止 `git add -A`。下一位開發者應先決定 Career v4 這批檔案要獨立 commit、繼續開發或暫存，不要覆蓋。
+- Web 首頁直接進入 Manager Mode；獨立的普通文字比賽畫面已從 App 移除。
+- Manager 頁首可切換 Career Mode，Career 可返回 Manager。
+- GitHub Pages 只部署靜態 Web；所有 Manager/Career mutation 仍由 Linux FastAPI
+  與 SQLite 權威處理。
 
 ## 8. 建議下一步
 
-1. 完成本次 Manager stats 的 CI、Pages 與 Linux backend deployment 驗證。
-2. 對文件做一次 reconciliation：更新過期的 in-memory Game 與舊測試數說明。
-3. 以獨立 commit 接續 Career v4 aggregate，再做 Web weekly dashboard vertical slice。
-4. Career v4 兩季 E2E 與 production restart 證據完成後，再判定 Phase 1 是否可正式封版。
+依產品決策先暫停，不進入全民打棒球／抽卡交易內容。下一輪若繼續，優先順序是
+Career 的逐打席策略、出場身分與 runner stats，而不是新增另一套遊戲系統。

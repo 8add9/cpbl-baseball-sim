@@ -2,22 +2,32 @@ import { JSON_HEADERS, operationId, request } from './client'
 
 export type Archetype = 'contact' | 'power' | 'patient' | 'speed' | 'balanced'
 export type CareerSkillName = 'contact' | 'power' | 'eye' | 'speed_proxy'
-export interface CareerSkill { score: number; rating_raw: number; rating_display: number; potential_score: number; next_cost: number | null; can_train: boolean }
-export interface BattingStats { games: number; pa: number; ab: number; hits: number; singles: number; doubles: number; triples: number; home_runs: number; walks: number; hbp: number; strikeouts: number; total_bases: number; avg: number; obp: number; slg: number; ops: number }
-export interface CareerGameResult { season_year: number; game_number: number; plate_appearances: number; outcomes: string[]; hits: number; home_runs: number; walks: number; xp_earned: number; development_points_earned: number }
+export type WeeklyAction = 'contact_training' | 'power_training' | 'eye_training' | 'speed_training' | 'recovery' | 'video_study' | 'extra_batting_practice'
+export interface CareerV4Skill { score: number; rating_raw: number; rating_display: number; xp: number }
+export interface CareerV4Stats { games: number; pa: number; hits: number; home_runs: number; walks: number; strikeouts: number; avg: number; obp: number; slg: number; ops: number }
+export interface CareerV4Day { weekday: number; is_game_day: boolean; opponent_id: string | null; is_home: boolean | null; planned_action: string | null }
 export interface CareerView {
   career_id: string; revision: number; autosaved_at: string; persistence_version: string; schema_version: number; model_version: string
-  name: string; position: string; bats: string; throws: string; archetype: Archetype; age: number; season_year: number
-  games_played: number; season_games: number; experience: number; development_points: number; expired_development_points: number
-  season_purchases: number; retired: boolean
-  active_game: null | { season_year: number; game_number: number; inning: number; half: 'top' | 'bottom'; outs: number; bases: Array<string | null>; away_score: number; home_score: number; batting_team: 'away' | 'home'; batter: string; pitcher: string; away_pitcher: string; home_pitcher: string; seed: number; game_plate_appearances: number; career_plate_appearances: number; career_outcomes: string[]; away_lineup: string[]; home_lineup: string[] }
-  skills: Record<CareerSkillName, CareerSkill>; season_stats: BattingStats; career_stats: BattingStats; recent_results: CareerGameResult[]
+  migrated_from_schema: number | null; name: string; position: string; bats: string; throws: string; archetype: Archetype; age: number
+  season_year: number; games_played: number; week: number; weekday: number; phase: string
+  current_plan: Array<{ weekday: number; action: WeeklyAction }> | null; action_points_remaining: number
+  fatigue: number; form: number; injured: boolean; coach_trust: number; team_status: string
+  skills: Record<CareerSkillName, CareerV4Skill>; season_stats: CareerV4Stats; career_stats: CareerV4Stats
+  completed_seasons: number; calendar_days: CareerV4Day[]; available_actions: string[]
+  season_award: string | null; contract_summary: string | null
 }
 
-export async function listCareers(): Promise<CareerView[]> { return (await request<{ careers: CareerView[] }>('/api/careers')).careers }
+export function listCareers(): Promise<CareerView[]> { return request('/api/careers-v4') }
 export function createCareer(input: { name: string; archetype: Archetype; bats: 'left' | 'right' | 'switch'; throws: 'left' | 'right'; position: string }): Promise<CareerView> {
-  return request('/api/careers', { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify({ ...input, season_year: 2026, seed: 20260812, season_games: 120, expected_revision: 0, operation_id: operationId() }) })
+  return request('/api/careers-v4', { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify({
+    ...input, season_year: 2026, seed: Date.now() % 2147483647, team_id: 'career-player',
+    opponent_ids: ['中信兄弟', '統一7-ELEVEn獅', '樂天桃猿', '味全龍', '台鋼雄鷹'],
+    expected_revision: 0, operation_id: operationId(),
+  }) })
 }
-export function mutateCareer(career: CareerView, action: 'train' | 'next-pa' | 'simulate-game' | 'simulate-month' | 'simulate-week' | 'simulate-to-next-event' | 'simulate-season', extra: Record<string, unknown> = {}): Promise<CareerView> {
-  return request(`/api/careers/${encodeURIComponent(career.career_id)}/${action}`, { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify({ expected_revision: career.revision, operation_id: operationId(), ...extra }) })
+export function planCareerWeek(career: CareerView, actions: Array<{ weekday: number; action: WeeklyAction }>): Promise<CareerView> {
+  return request(`/api/careers-v4/${career.career_id}/plan-week`, { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify({ expected_revision: career.revision, operation_id: operationId(), actions }) })
+}
+export function mutateCareer(career: CareerView, action: 'advance-day' | 'simulate-week' | 'simulate-season' | 'advance-phase'): Promise<CareerView> {
+  return request(`/api/careers-v4/${career.career_id}/${action}`, { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify({ expected_revision: career.revision, operation_id: operationId() }) })
 }
