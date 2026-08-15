@@ -173,7 +173,10 @@ def aggregate_from_dict(value: object) -> CareerAggregateV4:
             if plan.action_points_used != int(plan_data["action_points_used"]):
                 raise ValueError("saved action point total is invalid")
         return CareerAggregateV4(
-            career=career_from_dict(value["career"]),
+            # Career v4 weekly training predates full business-event sourcing and can
+            # legitimately change Score outside the embedded v3 event stream. SQLite
+            # CAS is authoritative here; the v3 standalone codec keeps strict replay.
+            career=career_from_dict(value["career"], verify_event_log=False),
             calendar=calendar,
             lifecycle=lifecycle,
             weekly_development=development,

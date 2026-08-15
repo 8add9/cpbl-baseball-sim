@@ -345,7 +345,7 @@ def _load_game_state(value: object) -> GameState:
     )
 
 
-def career_from_dict(value: object) -> CareerState:
+def career_from_dict(value: object, *, verify_event_log: bool = True) -> CareerState:
     try:
         root = _as_dict(value, "save")
         if int(root["schema_version"]) != CAREER_SCHEMA_VERSION:
@@ -423,7 +423,7 @@ def career_from_dict(value: object) -> CareerState:
         # from its immutable origin and versioned event stream.
         from .simulation import replay_career
 
-        if replay_career(initial_state(origin), state.events) != state:
+        if verify_event_log and replay_career(initial_state(origin), state.events) != state:
             raise CareerSaveError("career state does not match its event log")
         return state
     except CareerSaveError:
